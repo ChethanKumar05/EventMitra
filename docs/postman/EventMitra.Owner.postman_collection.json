@@ -1,15 +1,227 @@
 {
   "info": {
-    "name": "EventMitra - Owner Authentication",
+    "name": "EventMitra - Owner API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Separate owner login/logout collection. Import the Owner Local environment, set private credentials, and run ONE folder for your chosen login method. Pending and verified owners can log in. Shared names require email. Owner sessions use their own cookie; no bearer token. No default owner account is created."
+    "description": "Signup, test OTP verification, login/logout, and password recovery. Signup first creates a pending owner; names must be unique. Test OTP is 1111 and real email/SMS delivery is not connected. OTPs are disabled in production. Reset uses a verified password-reset token, not a general verification token. Run signup once; use existing-account auth folders separately afterward."
   },
   "auth": {
     "type": "noauth"
   },
   "item": [
     {
-      "name": "Login with email",
+      "name": "01 - Signup (run once per account)",
+      "item": [
+        {
+          "name": "Signup owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/signup",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"owner_name\": \"{{owner_name}}\",\n  \"owner_phone_number\": \"{{owner_phone_number}}\",\n  \"country_code\": \"{{country_code}}\",\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\",\n  \"alternative_number\": null,\n  \"profile_image\": null,\n  \"alternative_email\": null,\n  \"whatsapp_number\": null,\n  \"gender\": \"m\",\n  \"doc_type\": \"passport\",\n  \"doc_number\": \"REPLACE_WITH_DOCUMENT_NUMBER\",\n  \"doc_image\": \"/uploads/owner-document.jpg\",\n  \"pin_code\": \"560001\",\n  \"state\": \"Karnataka\",\n  \"city\": \"Bengaluru\",\n  \"area\": \"Indiranagar\",\n  \"lat\": 12.9716,\n  \"long\": 77.5946,\n  \"address\": \"REPLACE_WITH_ADDRESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                  "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Verify signup email",
+      "item": [
+        {
+          "name": "Send email OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/send-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"email\",\n  \"email\": \"{{owner_email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "if(pm.response.code===200)pm.collectionVariables.set('email_otp_token',pm.response.json().data.otp_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify email OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/verify-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"1111\",\n  \"otp_token\": \"{{email_otp_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Verify signup phone",
+      "item": [
+        {
+          "name": "Send phone OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/send-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"phone\",\n  \"country_code\": \"{{country_code}}\",\n  \"phone_number\": \"{{owner_phone_number}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "if(pm.response.code===200)pm.collectionVariables.set('phone_otp_token',pm.response.json().data.otp_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify phone OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/verify-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"1111\",\n  \"otp_token\": \"{{phone_otp_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 - Login with email",
       "description": "Run this folder for this login method. The last request expects 401 after logout. Do not run the name folder for a shared owner name.",
       "item": [
         {
@@ -36,7 +248,7 @@
                 }
               }
             },
-            "description": "Use an existing pending or verified owner with an app-generated scrypt-v1 password hash. Owner names may contain spaces. When more than one owner has the same name, use the email folder."
+            "description": "Use an existing pending or verified owner with an app-generated scrypt-v1 password hash. Owner names may contain spaces and are unique after case/whitespace normalization."
           },
           "response": [],
           "event": [
@@ -136,7 +348,7 @@
       ]
     },
     {
-      "name": "Login with owner name",
+      "name": "5 - Login with owner name",
       "description": "Run this folder for this login method. The last request expects 401 after logout. Do not run the name folder for a shared owner name.",
       "item": [
         {
@@ -163,7 +375,7 @@
                 }
               }
             },
-            "description": "Use an existing pending or verified owner with an app-generated scrypt-v1 password hash. Owner names may contain spaces. When more than one owner has the same name, use the email folder."
+            "description": "Use an existing pending or verified owner with an app-generated scrypt-v1 password hash. Owner names may contain spaces and are unique after case/whitespace normalization."
           },
           "response": [],
           "event": [
@@ -261,6 +473,370 @@
           ]
         }
       ]
+    },
+    {
+      "name": "06 - Forgot password via email",
+      "item": [
+        {
+          "name": "Request password reset OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/forgot-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"email\",\n  \"email\": \"{{owner_email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "if(pm.response.code===200)pm.collectionVariables.set('reset_otp_token',pm.response.json().data.otp_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify reset OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/verify-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"1111\",\n  \"otp_token\": \"{{reset_otp_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/reset-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp_token\": \"{{reset_otp_token}}\",\n  \"new_password\": \"{{owner_new_password}}\",\n  \"confirm_password\": \"{{owner_new_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login after reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_new_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout after reset",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/api/owner/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "07 - Forgot password via phone",
+      "item": [
+        {
+          "name": "Request password reset OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/forgot-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"phone\",\n  \"country_code\": \"{{country_code}}\",\n  \"phone_number\": \"{{owner_phone_number}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "if(pm.response.code===200)pm.collectionVariables.set('reset_otp_token',pm.response.json().data.otp_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify reset OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/verify-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"1111\",\n  \"otp_token\": \"{{reset_otp_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/reset-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp_token\": \"{{reset_otp_token}}\",\n  \"new_password\": \"{{owner_new_password}}\",\n  \"confirm_password\": \"{{owner_new_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login after reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_new_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout after reset",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/api/owner/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
     }
   ],
   "event": [
@@ -275,6 +851,23 @@
           "}"
         ]
       }
+    }
+  ],
+  "variable": [
+    {
+      "key": "email_otp_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "phone_otp_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reset_otp_token",
+      "value": "",
+      "type": "string"
     }
   ]
 }

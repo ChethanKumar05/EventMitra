@@ -4,7 +4,7 @@ import { digest,verifyPassword } from '../security/password';
 import { OwnerIdentity,OwnerLoginInput } from '../types/owner';
 import { httpError } from '../utils/httpError';
 const allowedStatuses=['pending','verified'];
-const publicColumns='owner_id,owner_code,owner_name,email,status,kyc_verification,is_phone_number_verified';
+const publicColumns='owner_id,owner_code,owner_name,email,status,kyc_verification,is_email_verified,is_phone_number_verified';
 function invalidCredentials():never { return httpError(401,'Invalid owner name/email or password. Use email if your name is shared.'); }
 interface OwnerCredential extends OwnerIdentity { password:string; }
 async function loginAttempt(key:string,limit:number):Promise<void> {
@@ -17,7 +17,7 @@ async function loginAttempt(key:string,limit:number):Promise<void> {
 export async function loginOwner(input:OwnerLoginInput,ip:string) {
   await loginAttempt(digest(`owner-ip:${ip}`),100);
   // Field selection comes from the controller's union, never client SQL text.
-  const predicate=input.field==='email'?'lower(email)=$1':'lower(btrim(owner_name))=$1';
+  const predicate=input.field==='email'?'lower(email)=$1':"lower(regexp_replace(btrim(owner_name),'[[:space:]]+',' ','g'))=$1";
   const result=await pool.query<OwnerCredential>(`SELECT ${publicColumns},password FROM public.owner WHERE ${predicate} ORDER BY owner_id LIMIT 2`,[input.identifier]);
   const owner=result.rows.length===1?result.rows[0]:undefined;
   await loginAttempt(digest(`owner-account:${ip}|${owner?.owner_id??`${input.field}:${input.identifier}`}`),10);
@@ -33,7 +33,7 @@ export async function loginOwner(input:OwnerLoginInput,ip:string) {
       if(!current||!allowedStatuses.includes(current.status)||current.password!==owner.password||(input.field==='email'&&current.email?.toLowerCase()!==input.identifier))invalidCredentials();
       // Recheck name ambiguity while creating the session as well.
       if(input.field==='owner_name'){
-        const matches=await client.query('SELECT owner_id FROM public.owner WHERE lower(btrim(owner_name))=$1 LIMIT 2',[input.identifier]);
+        const matches=await client.query("SELECT owner_id FROM public.owner WHERE lower(regexp_replace(btrim(owner_name),'[[:space:]]+',' ','g'))=$1 LIMIT 2",[input.identifier]);
         if(matches.rows.length!==1||matches.rows[0].owner_id!==current.owner_id)invalidCredentials();
       }
       await client.query('DELETE FROM public.owner_sessions WHERE expires_at<=now()');
@@ -48,7 +48,7 @@ export async function loginOwner(input:OwnerLoginInput,ip:string) {
   return {session,owner:identity};
 }
 export async function findSessionOwner(session:string):Promise<OwnerIdentity|null> {
-  const result=await pool.query<OwnerCredential&{password_fingerprint:string}>(`SELECT o.owner_id,o.owner_code,o.owner_name,o.email,o.status,o.kyc_verification,o.is_phone_number_verified,o.password,s.password_fingerprint
+  const result=await pool.query<OwnerCredential&{password_fingerprint:string}>(`SELECT o.owner_id,o.owner_code,o.owner_name,o.email,o.status,o.kyc_verification,o.is_email_verified,o.is_phone_number_verified,o.password,s.password_fingerprint
     FROM public.owner_sessions s JOIN public.owner o USING(owner_id)
     WHERE s.token_hash=$1 AND s.expires_at>now() AND o.status=ANY($2::varchar[])`,[digest(session),allowedStatuses]);
   const row=result.rows[0];

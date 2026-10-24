@@ -132,3 +132,5 @@ or email + password. Pending and verified owners are allowed; shared names requi
 See [owner authentication](docs/owner-auth.md) and import the separate
 [owner Postman collection](docs/postman/EventMitra.Owner.postman_collection.json).
 Apply pending migration 011 before running these endpoints.
+
+Owner signup and email/phone test OTP verification, forgot-password and reset-password flows are implemented. Apply migration 012 and see [Owner signup and OTP documentation](docs/owner-signup-otp.md). OTP is fixed at 1111 for development only; no external email/SMS delivery is configured.

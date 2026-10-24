@@ -1,3 +1,4 @@
+import { ownerName } from './ownerValidation';
 import * as service from '../services/ownerAuthService';
 import { ownerCookieName,ownerCookieOptions,ownerSessionToken } from '../middleware/ownerAuth';
 import { handler,text } from './securityValidation';
@@ -10,7 +11,7 @@ export const login=handler(async(req,res)=>{
   const fields=['owner_name','email'].filter(key=>body[key]!==undefined);
   if(fields.length!==1)httpError(400,'Provide exactly one of owner_name or email');
   const field=fields[0] as 'owner_name'|'email';
-  const identifier=field==='email'?normalizeEmail(body.email):text(body.owner_name,'owner_name',150).toLowerCase();
+  const identifier=field==='email'?normalizeEmail(body.email):ownerName(body.owner_name).toLowerCase();
   if(field==='owner_name'&&/[\u0000-\u001f\u007f]/.test(identifier))httpError(400,'Invalid owner_name');
   const password=body.password;
   if(typeof password!=='string'||!password||Buffer.byteLength(password)>256)httpError(400,'Password is required and must be at most 256 bytes');

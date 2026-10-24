@@ -1,8 +1,6 @@
 # Owner login and logout
 
-Owner authentication is separate from admin authentication. This change implements login,
-logout and a current-owner endpoint; owner registration/CRUD and business permissions will
-be added separately. No owner accounts or default credentials are created by migrations.
+Owner authentication is separate from admin authentication. Login, logout and current-owner endpoints are implemented, along with signup, test OTP verification and password recovery described in [owner signup/OTP flows](owner-signup-otp.md). Other owner CRUD and business permissions will be added separately. No owner accounts or default credentials are created by migrations.
 
 Apply pending migrations using `npm run migrate`, then start with `npm run dev`.
 New migration **011_owner_auth_migration** adds owner sessions, throttling, a nonunique name
@@ -38,21 +36,20 @@ Login with owner name:
 ```
 
 Email and owner-name matching ignore case. Leading/trailing name whitespace is trimmed;
-internal spaces are permitted and matched literally. Names must be nonblank strings of at most
+internal spaces are permitted and whitespace runs are normalized. Names are now unique ignoring case and repeated/outer spaces after migration 012. Names must be nonblank strings of at most
 150 characters and contain no control characters. Email uses the existing format validator.
 Password is required, must be a nonempty string and at most 256 UTF-8 bytes. Login never trims
 or changes a password. Both identity fields supplied together, neither field, arrays, malformed
 emails, invalid types, and missing passwords return 400.
 
 **Pending and verified owners can log in.** Rejected, blocked, hold and deleted owners cannot.
-Owner names are not unique; if a name matches multiple owners, name login fails and the owner
-must use email. This remains true even if some matching owners have ineligible statuses.
+Migration 012 rejects existing duplicate normalized names for review and prevents new duplicates. Name-based login also refuses ambiguous matches as a fallback.
 Failures use a generic 401 message and never reveal password/account document details.
 
 The existing owner.password column must hold a hash produced by the shared
 `src/security/password.ts` hashPassword helper (`scrypt-v1`, N=131072, r=8, p=1), never plaintext.
 Other hash formats and plaintext do not authenticate. Existing passwords are not rewritten.
-No default password or account-creation endpoint is introduced as part of login/logout.
+Signup is available through /api/owner/auth/signup; no default password or account is created.
 
 ## Session behavior
 
@@ -70,6 +67,7 @@ Successful login returns basic owner data and an eight-hour session cookie:
     "email": "owner@example.com",
     "status": "pending",
     "kyc_verification": false,
+    "is_email_verified": false,
     "is_phone_number_verified": false
   }
 }
@@ -134,3 +132,5 @@ in the supplied environment are empty. Keep entered values private.
 Integration tests cover both login methods, pending/verified eligibility, shared names,
 incorrect/unsafe stored passwords, sensitive-field exclusion, admin/owner separation, multiple
 sessions, logout, expiry, password/status revocation, deletion, origins and persistent throttling.
+
+Apply migration 012 for signup, OTP and password reset support. See [required fields and complete payloads](owner-signup-otp.md). Owner verification records are target/token based and no longer contain owner_id.

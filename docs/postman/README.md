@@ -35,3 +35,5 @@ Owner authentication has its own collection and environment, independent of the 
 [Owner environment](EventMitra.Owner.local.postman_environment.json).
 See [owner login/logout setup and test instructions](../owner-auth.md). Run only the folder
 for your chosen login method; shared owner names must use email.
+
+The Owner collection now includes Signup, email/phone Send OTP + Verify OTP, and email/phone Forgot Password + Reset Password folders. Test OTP is 1111; no email/SMS delivery is connected. See [Owner signup/OTP](../owner-signup-otp.md). Signup first, then verify. Names must be unique after migration 012.

@@ -62,6 +62,18 @@ test('PostgreSQL security API integration', { skip: !url && 'Set TEST_DATABASE_U
     await upgrade.query("DELETE FROM public.modules WHERE module_id='duplicate-name'");
     await migration10(upgrade);
     assert.equal((await upgrade.query("SELECT admin_username FROM public.admin WHERE admin_id='legacy-admin'")).rows[0].admin_username,'adm00027');
+    await require('../dist/migrations/003_owner_migration').ownerMigration(upgrade);
+    await upgrade.query(`INSERT INTO public.owner(owner_id,owner_code,country_code,owner_phone_number,owner_name,password) VALUES
+      ('old-owner','OWN00020','+91','9000000001','Legacy Owner','old-hash'),('old-owner-2','OWN00021','+91','9000000002',' legacy  OWNER ','old-hash')`);
+    await upgrade.query(`INSERT INTO public.owner_phone_verification(otp_id,owner_id,otp,is_verified,expires_at) VALUES ('old-otp','old-owner','old-otp-hash',true,now()+interval '1 hour')`);
+    await require('../dist/migrations/011_owner_auth_migration').ownerAuthMigration(upgrade);
+    const signupMigration=require('../dist/migrations/012_owner_signup_otp_migration').ownerSignupOtpMigration;
+    await assert.rejects(signupMigration(upgrade),/Rename duplicate owner_name/);
+    await upgrade.query("UPDATE public.owner SET owner_name='Second legacy owner' WHERE owner_id='old-owner-2'");
+    await signupMigration(upgrade);
+    const migratedOtp=(await upgrade.query("SELECT *,expires_at<=now() AS expired FROM public.owner_phone_verification WHERE otp_id='old-otp'")).rows[0];
+    assert.equal(migratedOtp.owner_id,undefined);assert.equal(migratedOtp.phone_number,'9000000001');assert.equal(migratedOtp.country_code,'+91');assert.equal(migratedOtp.expired,true);assert.ok(migratedOtp.consumed_at);assert.match(migratedOtp.otp_token,/^[a-f0-9]{64}$/);
+    assert.equal((await upgrade.query(`INSERT INTO public.owner(owner_id,country_code,owner_phone_number,owner_name,password) VALUES ('after-signup-migration','+91','9000000003','Third legacy owner','old-hash') RETURNING owner_code`)).rows[0].owner_code,'OWN00022');
   } finally { await upgrade.query('ROLLBACK'); upgrade.release(); }
   await runMigrations();
   const existing = await pool.query('SELECT count(*)::int AS n FROM public.admin');
