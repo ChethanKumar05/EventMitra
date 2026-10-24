@@ -101,13 +101,13 @@ GET  /api/venues?page=1&limit=20
 GET  /api/venues/:venueId
 ```
 
-The venue read routes only return `status='Active'` and `is_active=true` rows. `/api/user/health` is a compatibility health check, **not** an implemented User API. Models for user, owner, and booking have raw query examples; their CRUD routes are **not** implemented yet. Admin management routes are documented in [docs/admin-api.md](docs/admin-api.md).
+The venue read routes only return `status='Active'` and `is_active=true` rows. `/api/user/health` remains a compatibility health check. User and owner authentication/signup are implemented; their general CRUD routes and booking CRUD are not implemented yet. Admin management routes are documented in [docs/admin-api.md](docs/admin-api.md).
 
 ## Booking & payment safety notes
 
 - **No reservation-writing endpoints are exposed yet.** The booking migration includes a PostgreSQL exclusion constraint that prevents overlapping `Accepted` bookings at the same venue, but `Requested` and `Hold` bookings have no expiry/concurrency management. Booking per-slot semantics and multi-hall bookings must be designed before accepting real reservations.
 - **No payment-writing endpoints are exposed yet.** Razorpay order creation, signature verification, idempotent webhooks, reconciliation, refunds, and authorization are still to be implemented. Raw JSON must not be trusted as payment confirmation.
-- **Admin authentication is implemented.** User/owner authentication, OTP hashing/expiry/attempt rate limiting, owner account approval and ownership checks remain to be implemented before exposing protected booking or owner mutations. The included public venues reads do not expose owner private information.
+- **Admin, owner and user authentication are implemented.** OTP delivery currently uses the development stub described below. Owner account approval and resource ownership checks are still needed before exposing protected booking or owner mutations. The included public venues reads do not expose owner private information.
 - Owner `password` column must receive a strong *hash*, never plaintext. `otp` columns must receive hashed OTPs, never plaintext codes.
 - The user supplied `booking_payment_id` in `booking`. We retain it as a nullable pointer to a selected payment, while `booking_payment_details` supports multiple transactions for one booking.
 - Decorations/meals/pricing associations do not yet enforce that referenced packages belong to the same venue. Validate this in booking logic before launch.
@@ -128,9 +128,13 @@ Migration 010 adds usernames, normalized unique role/module names, and stricter 
 ## Owner authentication
 
 Owner login/logout is implemented separately. Owners can log in using owner_name + password
-or email + password. Pending and verified owners are allowed; shared names require email.
+or email + password. Pending and verified owners are allowed; names must be unique after migration 012.
 See [owner authentication](docs/owner-auth.md) and import the separate
 [owner Postman collection](docs/postman/EventMitra.Owner.postman_collection.json).
 Apply pending migration 011 before running these endpoints.
 
 Owner signup and email/phone test OTP verification, forgot-password and reset-password flows are implemented. Apply migration 012 and see [Owner signup and OTP documentation](docs/owner-signup-otp.md). OTP is fixed at 1111 for development only; no external email/SMS delivery is configured.
+
+## User authentication
+
+User signup and phone-only OTP login, verification, resend, current-user and logout endpoints are implemented under `/api/user/auth`. Signup creates a pending user; verification creates a separate user session. Apply migration 013. OTP is fixed at `1111` for development and disabled in production. See [User authentication and payloads](docs/user-auth.md) and the separate [User Postman collection](docs/postman/EventMitra.User.postman_collection.json). Run `npm run test:user:integration:local` for isolated PostgreSQL/HTTP tests.

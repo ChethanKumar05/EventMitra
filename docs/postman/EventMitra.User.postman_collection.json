@@ -1,0 +1,480 @@
+{
+  "info": {
+    "name": "EventMitra - User API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "User signup, phone-only OTP login, verify, resend, current user and logout. Apply migration 013. Select User Local environment and fill country_code, user_phone_number, user_name. Optional email may stay empty. Signup creates a pending user without a session. Login/resend return a challenge; verify establishes the user session cookie. Test OTP 1111; no SMS delivery is connected and OTP endpoints are disabled in production. Signup once; for existing users skip Signup. Keep the cookie jar enabled. Unknown/ineligible phones receive the same challenge response but cannot authenticate."
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "item": [
+    {
+      "name": "01 - Health",
+      "item": [
+        {
+          "name": "User health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/health"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Response status',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Signup (run once per account)",
+      "item": [
+        {
+          "name": "Signup user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/signup",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"country_code\": \"{{country_code}}\",\n  \"user_phone_number\": \"{{user_phone_number}}\",\n  \"user_name\": \"{{user_name}}\",\n  \"gender\": \"{{user_gender}}\",\n  \"email\": \"{{user_email}}\",\n  \"profile_image\": null,\n  \"whatsapp_number\": null,\n  \"alternative_number\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                  "pm.test('Response status',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "pm.test('Pending without phone verification',function(){const user=pm.response.json().data;pm.expect(user.status).to.eql('pending');pm.expect(user.is_phone_number_verified).to.eql(false);});",
+                  "if(pm.response.code===201){pm.collectionVariables.set('user_id',pm.response.json().data.user_id);}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Login using phone OTP",
+      "item": [
+        {
+          "name": "Login - request phone OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"country_code\": \"{{country_code}}\",\n  \"user_phone_number\": \"{{user_phone_number}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Response status',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "if(pm.response.code===200){pm.collectionVariables.set('otp_token',pm.response.json().data.otp_token);}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify login OTP - creates session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/verify-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"1111\",\n  \"otp_token\": \"{{otp_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Response status',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "pm.test('Phone verified',function(){pm.expect(pm.response.json().data.is_phone_number_verified).to.eql(true);});",
+                  "if(pm.response.code===200){pm.collectionVariables.set('user_id',pm.response.json().data.user_id);}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get current user",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/me"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Response status',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Resend OTP (replaces earlier challenge)",
+      "item": [
+        {
+          "name": "Request challenge to be superseded",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"country_code\": \"{{country_code}}\",\n  \"user_phone_number\": \"{{user_phone_number}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Response status',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "if(pm.response.code===200){pm.collectionVariables.set('superseded_otp_token',pm.response.json().data.otp_token);}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resend OTP - save latest token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/resend-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"country_code\": \"{{country_code}}\",\n  \"user_phone_number\": \"{{user_phone_number}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Response status',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "if(pm.response.code===200){pm.collectionVariables.set('otp_token',pm.response.json().data.otp_token);}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Superseded token must fail",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/verify-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"1111\",\n  \"otp_token\": \"{{superseded_otp_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401',function(){pm.response.to.have.status(401);});",
+                  "pm.test('Response status',function(){pm.expect(pm.response.json().status).to.eql(false);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify latest OTP - creates session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/verify-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"1111\",\n  \"otp_token\": \"{{otp_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Response status',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "pm.test('Phone verified',function(){pm.expect(pm.response.json().data.is_phone_number_verified).to.eql(true);});",
+                  "if(pm.response.code===200){pm.collectionVariables.set('user_id',pm.response.json().data.user_id);}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current user after resend verification",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/me"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Response status',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Logout",
+      "item": [
+        {
+          "name": "Logout current user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/logout"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Response status',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current session must be rejected",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/me"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401',function(){pm.response.to.have.status(401);});",
+                  "pm.test('Response status',function(){pm.expect(pm.response.json().status).to.eql(false);});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if(pm.request.body&&pm.request.body.mode==='raw') {",
+          "  const resolve=value=>typeof value==='string'?pm.variables.replaceIn(value):Array.isArray(value)?value.map(resolve):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,child])=>[key,resolve(child)])):value;",
+          "  pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "otp_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "superseded_otp_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

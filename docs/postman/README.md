@@ -37,3 +37,5 @@ See [owner login/logout setup and test instructions](../owner-auth.md). Run only
 for your chosen login method; shared owner names must use email.
 
 The Owner collection now includes Signup, email/phone Send OTP + Verify OTP, and email/phone Forgot Password + Reset Password folders. Test OTP is 1111; no email/SMS delivery is connected. See [Owner signup/OTP](../owner-signup-otp.md). Signup first, then verify. Names must be unique after migration 012.
+
+User signup and phone OTP login have a separate [User collection](EventMitra.User.postman_collection.json) and [User environment](EventMitra.User.local.postman_environment.json). Apply migration 013, select **EventMitra - User Local**, and fill `user_name`, `country_code`, `user_phone_number` (optional `user_email`). Run signup once, then Login, Resend OTP and Logout folders. Tokens are saved automatically; keep the cookie jar enabled. Both login and resend accept `country_code` + `user_phone_number`; verify accepts `otp` + `otp_token`. The test OTP is `1111`, and these OTP endpoints are disabled in production. See [User flow and copyable bodies](../user-auth.md).

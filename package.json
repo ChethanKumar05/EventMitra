@@ -16,7 +16,9 @@
     "test:integration:local": "npm run build && node tests/run-local-integration.cjs",
     "admin:bootstrap:sql": "tsx src/scripts/generateSuperAdminSql.ts",
     "test:owner:integration": "npm run build && node --test tests/owner-auth.integration.test.cjs",
-    "test:owner:integration:local": "npm run build && node tests/run-local-integration.cjs owner"
+    "test:owner:integration:local": "npm run build && node tests/run-local-integration.cjs owner",
+    "test:user:integration": "npm run build && node --test tests/user-auth.integration.test.cjs",
+    "test:user:integration:local": "npm run build && node tests/run-local-integration.cjs user"
   },
   "dependencies": {
     "compression": "^1.8.1",

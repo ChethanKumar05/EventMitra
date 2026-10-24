@@ -74,6 +74,23 @@ test('PostgreSQL security API integration', { skip: !url && 'Set TEST_DATABASE_U
     const migratedOtp=(await upgrade.query("SELECT *,expires_at<=now() AS expired FROM public.owner_phone_verification WHERE otp_id='old-otp'")).rows[0];
     assert.equal(migratedOtp.owner_id,undefined);assert.equal(migratedOtp.phone_number,'9000000001');assert.equal(migratedOtp.country_code,'+91');assert.equal(migratedOtp.expired,true);assert.ok(migratedOtp.consumed_at);assert.match(migratedOtp.otp_token,/^[a-f0-9]{64}$/);
     assert.equal((await upgrade.query(`INSERT INTO public.owner(owner_id,country_code,owner_phone_number,owner_name,password) VALUES ('after-signup-migration','+91','9000000003','Third legacy owner','old-hash') RETURNING owner_code`)).rows[0].owner_code,'OWN00022');
+    await require('../dist/migrations/002_user_migration').userMigration(upgrade);
+    await upgrade.query(`INSERT INTO public."user"(user_id,user_code,country_code,user_phone_number,user_name) VALUES
+      ('old-user','USR00020','+91','9111111111','Legacy User')`);
+    await upgrade.query(`INSERT INTO public.user_phone_verification(otp_id,user_id,otp,is_verified,expires_at)
+      VALUES ('old-user-otp','old-user','legacy-otp-hash',true,now()+interval '1 hour')`);
+    await require('../dist/migrations/013_user_auth_migration').userAuthMigration(upgrade);
+    const migratedUserOtp=(await upgrade.query("SELECT *,expires_at<=now() AS expired FROM public.user_phone_verification WHERE otp_id='old-user-otp'")).rows[0];
+    assert.equal(migratedUserOtp.user_id,undefined);
+    assert.equal(migratedUserOtp.user_phone_number,'9111111111');
+    assert.equal(migratedUserOtp.country_code,'+91');
+    assert.equal(migratedUserOtp.expired,true);
+    assert.ok(migratedUserOtp.consumed_at);
+    assert.equal(migratedUserOtp.account_fingerprint,null,'Historical OTP cannot authenticate an account');
+    assert.match(migratedUserOtp.otp_token,/^[a-f0-9]{64}$/);
+    assert.notEqual(migratedUserOtp.otp,'legacy-otp-hash');
+    assert.equal((await upgrade.query(`INSERT INTO public."user"(user_id,country_code,user_phone_number,user_name)
+      VALUES ('next-user','+91','9111111112','Next User') RETURNING user_code`)).rows[0].user_code,'USR00021');
   } finally { await upgrade.query('ROLLBACK'); upgrade.release(); }
   await runMigrations();
   const existing = await pool.query('SELECT count(*)::int AS n FROM public.admin');

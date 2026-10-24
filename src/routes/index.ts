@@ -1,4 +1,5 @@
 import ownerRoutes from './ownerRoutes';
+import userRoutes from './userRoutes';
 import securityRoutes from '../security/routes';
 import { Router } from 'express';
 import { pool } from '../config/database';
@@ -15,4 +16,5 @@ router.get('/health', async (_req, res, next) => {
 router.use('/venues', venueRoutes);
 router.use('/admin', securityRoutes);
 router.use('/owner',ownerRoutes);
+router.use('/user',userRoutes);
 export default router;

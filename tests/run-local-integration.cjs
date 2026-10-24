@@ -3,12 +3,13 @@ const { Pool }=require('pg');
 const {spawnSync}=require('node:child_process');
 const suites={
   security:{file:'tests/security.integration.test.cjs',env:'TEST_DATABASE_URL'},
-  owner:{file:'tests/owner-auth.integration.test.cjs',env:'OWNER_TEST_DATABASE_URL'}
+  owner:{file:'tests/owner-auth.integration.test.cjs',env:'OWNER_TEST_DATABASE_URL'},
+  user:{file:'tests/user-auth.integration.test.cjs',env:'USER_TEST_DATABASE_URL'}
 };
 (async()=>{
   const selected=process.argv.slice(2);
   const names=selected.length?selected:Object.keys(suites);
-  for(const name of names)if(!suites[name])throw new Error('Unknown integration suite. Use security or owner.');
+  for(const name of names)if(!suites[name])throw new Error('Unknown integration suite. Use security, owner or user.');
   const original=new URL(process.env.DATABASE_URL);
   const admin=new Pool({connectionString:original.toString(),connectionTimeoutMillis:3000,ssl:process.env.DB_SSL==='true'?{rejectUnauthorized:true}:false});
   try{

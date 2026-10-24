@@ -1,4 +1,5 @@
 import { ownerSignupOtpMigration } from './012_owner_signup_otp_migration';
+import { userAuthMigration } from './013_user_auth_migration';
 import { ownerAuthMigration } from './011_owner_auth_migration';
 import { adminIdentityValidationMigration } from './010_admin_identity_validation_migration';
 import { adminModulePermissionsMigration } from './009_admin_module_permissions_migration';
@@ -26,6 +27,7 @@ const migrations: Array<{ name: string; run: (client: PoolClient) => Promise<voi
   { name: '010_admin_identity_validation_migration', run: adminIdentityValidationMigration },
   { name: '011_owner_auth_migration', run: ownerAuthMigration },
   { name: '012_owner_signup_otp_migration', run: ownerSignupOtpMigration },
+  { name: '013_user_auth_migration', run: userAuthMigration },
 ];
 
 export async function runMigrations() {
