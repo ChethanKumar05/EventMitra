@@ -10,7 +10,13 @@
     "migrate": "tsx src/migrations/runMigrations.ts",
     "migrate:compiled": "node dist/migrations/runMigrations.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.cjs"
+    "test": "npm run build && node --test tests",
+    "admin:bootstrap": "tsx src/scripts/createSuperAdmin.ts",
+    "test:integration": "npm run build && node --test tests/security.integration.test.cjs",
+    "test:integration:local": "npm run build && node tests/run-local-integration.cjs",
+    "admin:bootstrap:sql": "tsx src/scripts/generateSuperAdminSql.ts",
+    "test:owner:integration": "npm run build && node --test tests/owner-auth.integration.test.cjs",
+    "test:owner:integration:local": "npm run build && node tests/run-local-integration.cjs owner"
   },
   "dependencies": {
     "compression": "^1.8.1",

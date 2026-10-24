@@ -1,3 +1,4 @@
+import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
@@ -18,5 +19,6 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/', (_req, res) => success(res, 'eventmitra server working', { service: 'eventmitra-api' }));
 app.get('/api/user/health', (_req, res) => success(res, 'healthy', { service: 'user-service' }));
 app.use('/api', apiRouter);
+app.use('/admin', express.static(path.resolve(process.cwd(), 'public')));
 app.use(notFound);
 app.use(errorHandler);

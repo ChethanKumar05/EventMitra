@@ -1,0 +1,1532 @@
+{
+  "info": {
+    "name": "EventMitra API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Main-module permission flow: login as your super admin, create role, create admin with that role, create main module, assign per-admin flags, and save the matrix. Login and auth/me return effective module permissions. No submodules. Codes are generated. Credentials remain empty in the local environment. Permission POST accepts an object or array and upserts existing rows. Login accepts email or username. New admins require admin_username. Names and identities are checked for duplicates."
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "run_suffix",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "role_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "module_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "permission_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Health",
+      "item": [
+        {
+          "name": "Server status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Database health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "User health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{admin_login}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "identifier accepts email or username. You may instead send email or username, but provide exactly one login field. Usernames contain no spaces. Set admin_login in the environment; legacy admin_email is used as a fallback."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('run_suffix',Date.now().toString());",
+                  "if (!pm.variables.get('admin_login')) pm.variables.set('admin_login',pm.variables.get('admin_email')||pm.variables.get('admin_username')||'');",
+                  "if (pm.request.body && pm.request.body.mode === 'raw') {",
+                  "  const resolve = value => typeof value === 'string' ? pm.variables.replaceIn(value) : Array.isArray(value) ? value.map(resolve) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child)])) : value;",
+                  "  pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });",
+                  "pm.test('Login returns module flags', function () { const data=pm.response.json().data; pm.expect(data.permissions).to.be.an('array'); if(data.permissions.length) pm.expect(data.permissions[0]).to.have.keys('module_id','module_code','module_key','module_name','all','create','read','edit','delete','view'); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Current admin and permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Roles",
+      "item": [
+        {
+          "name": "Create role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/roles",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role_type\": \"Operations {{run_suffix}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('role_id');",
+                  "if (pm.request.body && pm.request.body.mode === 'raw') {",
+                  "  const resolve = value => typeof value === 'string' ? pm.variables.replaceIn(value) : Array.isArray(value) ? value.map(resolve) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child)])) : value;",
+                  "  pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('role_id', pm.response.json().data.role_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "List roles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/roles?page={{page}}&limit={{limit}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "roles"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "search_column",
+                  "value": "all",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "sort_by",
+                  "value": "role_type",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "sort_order",
+                  "value": "asc",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "role_code",
+                  "value": "RL00001",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "role_type",
+                  "value": "Operations",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                }
+              ]
+            },
+            "description": "Column search: search + search_column (or all). Sort: sort_by + sort_order=asc|desc. All displayed columns have filters where applicable. Results include filtered totals and page navigation metadata."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get role",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/roles/{{role_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Update role",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/roles/{{role_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role_type\": \"Operations updated {{run_suffix}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.request.body && pm.request.body.mode === 'raw') {",
+                  "  const resolve = value => typeof value === 'string' ? pm.variables.replaceIn(value) : Array.isArray(value) ? value.map(resolve) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child)])) : value;",
+                  "  pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Admins",
+      "item": [
+        {
+          "name": "Create admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/admins",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"admin_name\": \"Operations admin\",\n  \"admin_email\": \"operations-{{run_suffix}}@example.test\",\n  \"password\": \"{{new_admin_password}}\",\n  \"role_id\": \"{{role_id}}\",\n  \"department\": \"Finance\",\n  \"status\": \"active\",\n  \"is_super_admin\": false,\n  \"admin_username\": \"operations_{{run_suffix}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('admin_id');",
+                  "if (pm.request.body && pm.request.body.mode === 'raw') {",
+                  "  const resolve = value => typeof value === 'string' ? pm.variables.replaceIn(value) : Array.isArray(value) ? value.map(resolve) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child)])) : value;",
+                  "  pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('admin_id', pm.response.json().data.admin_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "List admins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/admins?page={{page}}&limit={{limit}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "admins"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "search_column",
+                  "value": "all",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "sort_by",
+                  "value": "admin_name",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "sort_order",
+                  "value": "asc",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "admin_code",
+                  "value": "ADM00001",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "admin_name",
+                  "value": "Operations admin",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "role_id",
+                  "value": "{{role_id}}",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "role_type",
+                  "value": "Operations",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "department",
+                  "value": "Finance",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "admin_phone_number",
+                  "value": "9000000001",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "admin_email",
+                  "value": "operations@example.com",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "is_super_admin",
+                  "value": "false",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "admin_username",
+                  "value": "operations_{{run_suffix}}",
+                  "disabled": true,
+                  "description": "Exact username; case insensitive"
+                }
+              ]
+            },
+            "description": "Column search: search + search_column (or all). Sort: sort_by + sort_order=asc|desc. All displayed columns have filters where applicable. Results include filtered totals and page navigation metadata."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get admin",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/admins/{{admin_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Update admin",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/admins/{{admin_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"admin_name\": \"Operations admin updated\",\n  \"department\": \"Operations\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.request.body && pm.request.body.mode === 'raw') {",
+                  "  const resolve = value => typeof value === 'string' ? pm.variables.replaceIn(value) : Array.isArray(value) ? value.map(resolve) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child)])) : value;",
+                  "  pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 - Main modules",
+      "item": [
+        {
+          "name": "Create main module",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/modules",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"module_name\": \"Owner Management {{run_suffix}}\",\n  \"module_key\": \"sample_owner_{{run_suffix}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('module_id');",
+                  "if (pm.request.body && pm.request.body.mode === 'raw') {",
+                  "  const resolve = value => typeof value === 'string' ? pm.variables.replaceIn(value) : Array.isArray(value) ? value.map(resolve) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child)])) : value;",
+                  "  pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('module_id', pm.response.json().data.module_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "List modules",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/modules?page={{page}}&limit={{limit}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "modules"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "search_column",
+                  "value": "all",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "sort_by",
+                  "value": "module_name",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "sort_order",
+                  "value": "asc",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "module_code",
+                  "value": "MOD00001",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "module_key",
+                  "value": "owner_management",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "module_name",
+                  "value": "Owner Management",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                }
+              ]
+            },
+            "description": "Column search: search + search_column (or all). Sort: sort_by + sort_order=asc|desc. All displayed columns have filters where applicable. Results include filtered totals and page navigation metadata."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get module",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/modules/{{module_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Update module",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/modules/{{module_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"module_name\": \"Owner Management updated {{run_suffix}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.request.body && pm.request.body.mode === 'raw') {",
+                  "  const resolve = value => typeof value === 'string' ? pm.variables.replaceIn(value) : Array.isArray(value) ? value.map(resolve) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child)])) : value;",
+                  "  pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06 - Per-admin module permissions",
+      "item": [
+        {
+          "name": "Upsert admin permissions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/admin-permissions",
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"admin_id\": \"{{admin_id}}\",\n    \"role_id\": \"{{role_id}}\",\n    \"module_id\": \"{{module_id}}\",\n    \"all\": false,\n    \"create\": false,\n    \"read\": true,\n    \"edit\": false,\n    \"delete\": false,\n    \"view\": true\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Atomically upsert one or more permission objects. An existing admin/module row is updated for the admin current role; IDs/codes and omitted flags are retained. Missing rows are created. A single object is also accepted. No separate update endpoint."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('permission_id');",
+                  "if (pm.request.body && pm.request.body.mode === 'raw') {",
+                  "  const resolve = value => typeof value === 'string' ? pm.variables.replaceIn(value) : Array.isArray(value) ? value.map(resolve) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child)])) : value;",
+                  "  pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Permission array', function () { pm.expect(pm.response.json().data).to.be.an('array').that.is.not.empty; });",
+                  "if(pm.response.code===200) pm.collectionVariables.set('permission_id',pm.response.json().data[0].permission_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "List admin permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/admin-permissions?page={{page}}&limit={{limit}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "admin-permissions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "search_column",
+                  "value": "all",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "sort_by",
+                  "value": "module_name",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "sort_order",
+                  "value": "asc",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "admin_id",
+                  "value": "{{admin_id}}",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "role_id",
+                  "value": "{{role_id}}",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "module_id",
+                  "value": "{{module_id}}",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "permission_code",
+                  "value": "PER00001",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "admin_name",
+                  "value": "Operations admin",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "role_type",
+                  "value": "Operations",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "module_name",
+                  "value": "Owner Management",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "all",
+                  "value": "true",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "create",
+                  "value": "true",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "read",
+                  "value": "true",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "edit",
+                  "value": "true",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "delete",
+                  "value": "false",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "view",
+                  "value": "true",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                }
+              ]
+            },
+            "description": "Column search: search + search_column (or all). Sort: sort_by + sort_order=asc|desc. All displayed columns have filters where applicable. Results include filtered totals and page navigation metadata."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get admin permission",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/admin-permissions/{{permission_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Upsert existing admin permissions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/admin-permissions",
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"role_id\": \"{{role_id}}\",\n    \"all\": false,\n    \"create\": true,\n    \"read\": true,\n    \"edit\": true,\n    \"delete\": false,\n    \"view\": true,\n    \"admin_id\": \"{{admin_id}}\",\n    \"module_id\": \"{{module_id}}\"\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Atomically upsert one or more permission objects. An existing admin/module row is updated for the admin current role; IDs/codes and omitted flags are retained. Missing rows are created. A single object is also accepted. No separate update endpoint."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.request.body && pm.request.body.mode === 'raw') {",
+                  "  const resolve = value => typeof value === 'string' ? pm.variables.replaceIn(value) : Array.isArray(value) ? value.map(resolve) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child)])) : value;",
+                  "  pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Permission array', function () { pm.expect(pm.response.json().data).to.be.an('array').that.is.not.empty; });",
+                  "if(pm.response.code===200) pm.collectionVariables.set('permission_id',pm.response.json().data[0].permission_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get admin permission matrix",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/admins/{{admin_id}}/permissions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Save admin permission matrix",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/admins/{{admin_id}}/permissions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role_id\": \"{{role_id}}\",\n  \"permissions\": [\n    {\n      \"module_id\": \"{{module_id}}\",\n      \"all\": true\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.request.body && pm.request.body.mode === 'raw') {",
+                  "  const resolve = value => typeof value === 'string' ? pm.variables.replaceIn(value) : Array.isArray(value) ? value.map(resolve) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child)])) : value;",
+                  "  pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "07 - Cleanup and logout",
+      "item": [
+        {
+          "name": "Delete admin permission",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/admin-permissions/{{permission_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Delete module",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/modules/{{module_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Delete admin",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/admins/{{admin_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Delete role",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/roles/{{role_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "08 - Public venues",
+      "item": [
+        {
+          "name": "List venues",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/venues?page={{page}}&limit={{limit}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "venues"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "search_column",
+                  "value": "all",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "sort_by",
+                  "value": "venue_name",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "sort_order",
+                  "value": "asc",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "venue_code",
+                  "value": "VEN00001",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "city",
+                  "value": "Bengaluru",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "state",
+                  "value": "Karnataka",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "area",
+                  "value": "Indiranagar",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "owner_id",
+                  "value": "REPLACE_WITH_OWNER_ID",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "min_capacity",
+                  "value": "100",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                },
+                {
+                  "key": "max_capacity",
+                  "value": "500",
+                  "disabled": true,
+                  "description": "Optional: enable in Params. Filters combine with AND."
+                }
+              ]
+            },
+            "description": "Column search: search + search_column (or all). Sort: sort_by + sort_order=asc|desc. All displayed columns have filters where applicable. Results include filtered totals and page navigation metadata."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+  ]
+}

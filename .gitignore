@@ -6,3 +6,6 @@ dist/
 coverage/
 *.log
 .DS_Store
+
+# Generated pgAdmin bootstrap contains a private password hash.
+.local/admin-bootstrap.sql

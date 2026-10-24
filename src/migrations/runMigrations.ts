@@ -1,3 +1,8 @@
+import { ownerAuthMigration } from './011_owner_auth_migration';
+import { adminIdentityValidationMigration } from './010_admin_identity_validation_migration';
+import { adminModulePermissionsMigration } from './009_admin_module_permissions_migration';
+import { securityCodesMigration } from './008_security_codes_migration';
+import { securityMigration } from './007_security_migration';
 import { PoolClient } from 'pg';
 import { pool } from '../config/database';
 import { adminMigration } from './001_admin_migration';
@@ -14,6 +19,11 @@ const migrations: Array<{ name: string; run: (client: PoolClient) => Promise<voi
   { name: '004_venue_migration', run: venueMigration },
   { name: '005_booking_migration', run: bookingMigration },
   { name: '006_reviews_migration', run: reviewsMigration },
+  { name: '007_security_migration', run: securityMigration },
+  { name: '008_security_codes_migration', run: securityCodesMigration },
+  { name: '009_admin_module_permissions_migration', run: adminModulePermissionsMigration },
+  { name: '010_admin_identity_validation_migration', run: adminIdentityValidationMigration },
+  { name: '011_owner_auth_migration', run: ownerAuthMigration },
 ];
 
 export async function runMigrations() {

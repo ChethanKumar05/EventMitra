@@ -2,6 +2,19 @@
 
 A **runnable backend foundation**, not a production-ready booking/payments platform. Built around the uploaded `server.ts`: Express, Socket.IO, CORS, helmet, compression and default port `3600`. The original `Server`, `socket` and `response` references were undefined; they have been replaced with typed imports/helpers.
 
+## Admin authentication and security management
+
+Admin email-or-username/password login, database sessions, admin/role/permission CRUD, and responsive sample
+screens are implemented. The current flow is role -> admin -> main modules -> per-admin module
+permissions stored in `admin_permission`. Login includes the effective module action flags. See [Admin API documentation](docs/admin-api.md) for setup, endpoints,
+permissions, request bodies, security behavior, and integration tests.
+
+After reviewing the new migration, run `npm run migrate`, then `npm run admin:bootstrap` in
+an interactive terminal. This privately prompts for the first super admin; no default credentials
+are created. New admin, role and permission codes are generated automatically as `ADM00001`,
+`RL00001` and `PER00001`. Modules receive `MOD00001`. Migration 009 adds the per-admin
+main-module permission flow, preserves existing records and migrates earlier security read grants. Start the server and open `http://localhost:3600/admin/`.
+
 ## Folder layout
 
 ```text
@@ -73,7 +86,7 @@ npm run typecheck          # verify types
 npm run build              # output dist/
 npm start                  # start compiled server
 npm run migrate:compiled   # apply migrations from built JS
-npm test                   # static scaffold tests (does not contact database)
+npm test                   # builds and runs tests; database suite requires TEST_DATABASE_URL
 ```
 
 Migrations run **sequentially**, using `migrations_history`. The runner creates that history table, takes a PostgreSQL advisory lock, wraps **each migration** in a transaction, records it on success, and rolls it back on error. Do not edit an already-applied migration in production: add a new migration instead. Avoid running migration scripts with `Promise.all()`.
@@ -88,13 +101,13 @@ GET  /api/venues?page=1&limit=20
 GET  /api/venues/:venueId
 ```
 
-The venue read routes only return `status='Active'` and `is_active=true` rows. `/api/user/health` is a compatibility health check, **not** an implemented User API. Models for user, owner, admin, and booking have raw query examples, but their CRUD routes are **not** implemented yet.
+The venue read routes only return `status='Active'` and `is_active=true` rows. `/api/user/health` is a compatibility health check, **not** an implemented User API. Models for user, owner, and booking have raw query examples; their CRUD routes are **not** implemented yet. Admin management routes are documented in [docs/admin-api.md](docs/admin-api.md).
 
 ## Booking & payment safety notes
 
 - **No reservation-writing endpoints are exposed yet.** The booking migration includes a PostgreSQL exclusion constraint that prevents overlapping `Accepted` bookings at the same venue, but `Requested` and `Hold` bookings have no expiry/concurrency management. Booking per-slot semantics and multi-hall bookings must be designed before accepting real reservations.
 - **No payment-writing endpoints are exposed yet.** Razorpay order creation, signature verification, idempotent webhooks, reconciliation, refunds, and authorization are still to be implemented. Raw JSON must not be trusted as payment confirmation.
-- **No authentication is implemented yet.** Add JWT authentication, OTP hashing/expiry/attempt rate limiting, owner account approval, admin RBAC and ownership checks before exposing any protected data or mutation endpoint. The included public venues reads do not expose owner private information.
+- **Admin authentication is implemented.** User/owner authentication, OTP hashing/expiry/attempt rate limiting, owner account approval and ownership checks remain to be implemented before exposing protected booking or owner mutations. The included public venues reads do not expose owner private information.
 - Owner `password` column must receive a strong *hash*, never plaintext. `otp` columns must receive hashed OTPs, never plaintext codes.
 - The user supplied `booking_payment_id` in `booking`. We retain it as a nullable pointer to a selected payment, while `booking_payment_details` supports multiple transactions for one booking.
 - Decorations/meals/pricing associations do not yet enforce that referenced packages belong to the same venue. Validate this in booking logic before launch.
@@ -103,4 +116,19 @@ The venue read routes only return `status='Active'` and `is_active=true` rows. `
 
 ## Build verification
 
-The TypeScript source was syntax checked with the globally installed compiler. Full `npm install` and runtime/PostgreSQL integration validation require network/database access in your environment. See `tests/scaffold.test.cjs` for static checks that can run without database access.
+Run `npm run typecheck`, `npm run build` and `npm test`. For real PostgreSQL/HTTP integration
+tests, run `npm run test:integration:local` to create and remove an isolated temporary database,
+or configure `TEST_DATABASE_URL` and use `npm run test:integration`. See the admin API
+documentation for test database requirements and cleanup behavior.
+
+List APIs include pagination, search and filters. See [List API documentation](docs/list-api.md) for admin/role/permission and public venue query parameters.
+
+Migration 010 adds usernames, normalized unique role/module names, and stricter identity validation. Permission POST supports atomic object/array upserts; the separate per-record permission PUT endpoint is removed. See the updated API docs and Postman collection.
+
+## Owner authentication
+
+Owner login/logout is implemented separately. Owners can log in using owner_name + password
+or email + password. Pending and verified owners are allowed; shared names require email.
+See [owner authentication](docs/owner-auth.md) and import the separate
+[owner Postman collection](docs/postman/EventMitra.Owner.postman_collection.json).
+Apply pending migration 011 before running these endpoints.

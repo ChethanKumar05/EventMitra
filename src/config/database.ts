@@ -31,3 +31,8 @@ export async function withClient<T>(
         client.release();
     }
 }
+import { QueryResultRow } from 'pg';
+
+export async function query<T extends QueryResultRow>(sql: string, params: unknown[] = []): Promise<T[]> {
+    return (await pool.query<T>(sql, params)).rows;
+}

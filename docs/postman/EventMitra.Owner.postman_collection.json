@@ -1,0 +1,280 @@
+{
+  "info": {
+    "name": "EventMitra - Owner Authentication",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Separate owner login/logout collection. Import the Owner Local environment, set private credentials, and run ONE folder for your chosen login method. Pending and verified owners can log in. Shared names require email. Owner sessions use their own cookie; no bearer token. No default owner account is created."
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "item": [
+    {
+      "name": "Login with email",
+      "description": "Run this folder for this login method. The last request expects 401 after logout. Do not run the name folder for a shared owner name.",
+      "item": [
+        {
+          "name": "Login with email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Use an existing pending or verified owner with an app-generated scrypt-v1 password hash. Owner names may contain spaces. When more than one owner has the same name, use the email folder."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Envelope',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "pm.test('Safe owner identity',function(){const owner=pm.response.json().data;pm.expect(owner.owner_id).to.be.a('string');pm.expect(['pending','verified']).to.include(owner.status);pm.expect(owner).to.not.have.property('password');pm.expect(owner).to.not.have.property('doc_json');});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current owner",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/me",
+            "description": "The Postman cookie jar sends the owner cookie automatically. Admin cookies cannot authenticate this endpoint."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Envelope',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/logout",
+            "description": "No body. Revokes only the current owner session. Also clears expired/invalid owner cookies. Repeated logout returns 200."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Envelope',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify logged out",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/me"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401',function(){pm.response.to.have.status(401);});",
+                  "pm.test('Envelope',function(){pm.expect(pm.response.json().status).to.eql(false);});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Login with owner name",
+      "description": "Run this folder for this login method. The last request expects 401 after logout. Do not run the name folder for a shared owner name.",
+      "item": [
+        {
+          "name": "Login with owner name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"owner_name\": \"{{owner_name}}\",\n  \"password\": \"{{owner_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Use an existing pending or verified owner with an app-generated scrypt-v1 password hash. Owner names may contain spaces. When more than one owner has the same name, use the email folder."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Envelope',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "pm.test('Safe owner identity',function(){const owner=pm.response.json().data;pm.expect(owner.owner_id).to.be.a('string');pm.expect(['pending','verified']).to.include(owner.status);pm.expect(owner).to.not.have.property('password');pm.expect(owner).to.not.have.property('doc_json');});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current owner",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/me",
+            "description": "The Postman cookie jar sends the owner cookie automatically. Admin cookies cannot authenticate this endpoint."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Envelope',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/logout",
+            "description": "No body. Revokes only the current owner session. Also clears expired/invalid owner cookies. Repeated logout returns 200."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Envelope',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify logged out",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/me"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401',function(){pm.response.to.have.status(401);});",
+                  "pm.test('Envelope',function(){pm.expect(pm.response.json().status).to.eql(false);});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if(pm.request.body&&pm.request.body.mode==='raw'){",
+          "  const resolve=value=>typeof value==='string'?pm.variables.replaceIn(value):Array.isArray(value)?value.map(resolve):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,child])=>[key,resolve(child)])):value;",
+          "  pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+          "}"
+        ]
+      }
+    }
+  ]
+}
