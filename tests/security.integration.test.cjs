@@ -91,6 +91,18 @@ test('PostgreSQL security API integration', { skip: !url && 'Set TEST_DATABASE_U
     assert.notEqual(migratedUserOtp.otp,'legacy-otp-hash');
     assert.equal((await upgrade.query(`INSERT INTO public."user"(user_id,country_code,user_phone_number,user_name)
       VALUES ('next-user','+91','9111111112','Next User') RETURNING user_code`)).rows[0].user_code,'USR00021');
+    await upgrade.query(`INSERT INTO public.user_account_details(user_account_id,user_id,is_default) VALUES ('legacy-user-account','old-user',true)`);
+    await upgrade.query(`INSERT INTO public.owner_account_details(owner_account_id,owner_id,is_default) VALUES ('legacy-owner-account','old-owner',true)`);
+    for(let i=0;i<5;i++) await upgrade.query('INSERT INTO public.owner_account_details(owner_account_id,owner_id) VALUES($1,$2)',['excessive-'+i,'old-owner']);
+    const accountsMigration=require('../dist/migrations/014_people_accounts_migration').peopleAccountsMigration;
+    await assert.rejects(accountsMigration(upgrade),/more than five owner bank accounts/);
+    assert.equal((await upgrade.query("SELECT count(*)::int AS n FROM information_schema.columns WHERE table_schema='public' AND table_name='user_account_details' AND column_name='account_number'")).rows[0].n,0,'Account migration checks all limits before changing tables');
+    await upgrade.query("DELETE FROM public.owner_account_details WHERE owner_account_id LIKE 'excessive-%'");
+    await accountsMigration(upgrade);
+    for(const kind of ['user','owner']) {
+      const bank=(await upgrade.query(`SELECT * FROM public.${kind}_account_details WHERE ${kind}_account_id=$1`,['legacy-'+kind+'-account'])).rows[0];
+      assert.equal(bank.account_number,null); assert.equal(bank.branch_address,null); assert.equal(bank.is_default,true); assert.ok(bank.updated_at);
+    }
   } finally { await upgrade.query('ROLLBACK'); upgrade.release(); }
   await runMigrations();
   const existing = await pool.query('SELECT count(*)::int AS n FROM public.admin');

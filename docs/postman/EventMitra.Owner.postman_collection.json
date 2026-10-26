@@ -2,7 +2,7 @@
   "info": {
     "name": "EventMitra - Owner API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Signup, test OTP verification, login/logout, and password recovery. Signup first creates a pending owner; names must be unique. Test OTP is 1111 and real email/SMS delivery is not connected. OTPs are disabled in production. Reset uses a verified password-reset token, not a general verification token. Run signup once; use existing-account auth folders separately afterward."
+    "description": "Signup, test OTP verification, login/logout, and password recovery. Signup first creates a pending owner; names must be unique. Test OTP is 1111 and real email/SMS delivery is not connected. OTPs are disabled in production. Reset uses a verified password-reset token, not a general verification token. Run signup once; use existing-account auth folders separately afterward. Bank account add/list/get and default-only update are included; apply migration 014 and fill bank_* environment fields."
   },
   "auth": {
     "type": "noauth"
@@ -837,6 +837,303 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "08 - Bank accounts (logs in first)",
+      "description": "Apply migration 014. Fill bank_* environment values. Each run adds one account and counts toward the five-account limit. Self-service update accepts only is_default. Login uses existing profile; no signup here.",
+      "item": [
+        {
+          "name": "Login before managing bank accounts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Use an existing pending or verified owner with an app-generated scrypt-v1 password hash. Owner names may contain spaces and are unique after case/whitespace normalization."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Envelope',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "pm.test('Safe owner identity',function(){const owner=pm.response.json().data;pm.expect(owner.owner_id).to.be.a('string');pm.expect(['pending','verified']).to.include(owner.status);pm.expect(owner).to.not.have.property('password');pm.expect(owner).to.not.have.property('doc_json');});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add bank account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_number\": \"{{bank_account_number}}\",\n  \"account_holder_name\": \"{{bank_account_holder_name}}\",\n  \"ifsc_code\": \"{{bank_ifsc_code}}\",\n  \"branch_name\": \"{{bank_branch_name}}\",\n  \"branch_address\": \"{{bank_branch_address}}\",\n  \"passbook_image\": null,\n  \"is_default\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                  "if(pm.response.code<300){pm.collectionVariables.set('owner_account_id',pm.response.json().data.owner_account_id);}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "List my bank accounts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/owner/accounts?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "owner",
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "search_column",
+                  "value": "all",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "sort_by",
+                  "value": "owner_account_id",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "sort_order",
+                  "value": "asc",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "owner_account_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "account_number",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "account_holder_name",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "ifsc_code",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "branch_name",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "branch_address",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "is_default",
+                  "value": "true",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "created_at",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "updated_at",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get my bank account by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/accounts/{{owner_account_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Set my default account - only is_default allowed",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/accounts/{{owner_account_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_default\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Logout after bank accounts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
     }
   ],
   "event": [
@@ -866,6 +1163,11 @@
     },
     {
       "key": "reset_otp_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "owner_account_id",
       "value": "",
       "type": "string"
     }

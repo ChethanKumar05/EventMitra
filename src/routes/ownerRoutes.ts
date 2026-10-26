@@ -1,4 +1,5 @@
 import * as signup from '../controllers/ownerSignupController';
+import { bankAccountController } from '../controllers/bankAccountController';
 import { Router } from 'express';
 import * as auth from '../controllers/ownerAuthController';
 import { authenticateOwner,ownerAuthHeaders } from '../middleware/ownerAuth';
@@ -12,4 +13,9 @@ router.post('/auth/reset-password',signup.resetPassword);
 router.post('/auth/login',auth.login);
 router.get('/auth/me',authenticateOwner,auth.me);
 router.post('/auth/logout',auth.logout);
+const accounts=bankAccountController('owner');
+router.get('/accounts',authenticateOwner,accounts.list);
+router.get('/accounts/:accountId',authenticateOwner,accounts.get);
+router.post('/accounts',authenticateOwner,accounts.create);
+router.put('/accounts/:accountId',authenticateOwner,accounts.update);
 export default router;

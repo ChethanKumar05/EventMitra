@@ -1,5 +1,7 @@
 # EventMitra Postman setup
 
+Migration 014 adds admin user/owner management and bank accounts. Reimport all three collections and environments. The admin collection has new managed-profile/account folders. The user and owner collections have separate bank-account folders that log in first. Fill the new bank fields in the corresponding environment. Self-service PUT sends only `is_default`; admin PUT can edit bank details. See [People/account payloads and permissions](../people-and-accounts-api.md). Repeated adds count toward the five-account limit; profile deletion samples preserve history.
+
 1. Import `EventMitra.postman_collection.json` and `EventMitra.local.postman_environment.json`.
 2. Select EventMitra - Local. Set base_url if needed (default http://localhost:3600, no trailing slash).
 3. Set admin_email/admin_password to your own super admin and new_admin_password to a private

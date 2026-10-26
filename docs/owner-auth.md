@@ -1,6 +1,6 @@
 # Owner login and logout
 
-Owner authentication is separate from admin authentication. Login, logout and current-owner endpoints are implemented, along with signup, test OTP verification and password recovery described in [owner signup/OTP flows](owner-signup-otp.md). Other owner CRUD and business permissions will be added separately. No owner accounts or default credentials are created by migrations.
+Owner authentication is separate from admin authentication. Login, logout and current-owner endpoints are implemented, along with signup, test OTP verification and password recovery described in [owner signup/OTP flows](owner-signup-otp.md). Admin owner management and owner bank account APIs are documented in [People and account APIs](people-and-accounts-api.md). No owner profiles or default credentials are created by migrations.
 
 Apply pending migrations using `npm run migrate`, then start with `npm run dev`.
 New migration **011_owner_auth_migration** adds owner sessions, throttling, a nonunique name

@@ -18,7 +18,9 @@
     "test:owner:integration": "npm run build && node --test tests/owner-auth.integration.test.cjs",
     "test:owner:integration:local": "npm run build && node tests/run-local-integration.cjs owner",
     "test:user:integration": "npm run build && node --test tests/user-auth.integration.test.cjs",
-    "test:user:integration:local": "npm run build && node tests/run-local-integration.cjs user"
+    "test:user:integration:local": "npm run build && node tests/run-local-integration.cjs user",
+    "test:people:integration": "npm run build && node --test tests/people-accounts.integration.test.cjs",
+    "test:people:integration:local": "npm run build && node tests/run-local-integration.cjs people"
   },
   "dependencies": {
     "compression": "^1.8.1",

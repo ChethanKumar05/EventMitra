@@ -101,7 +101,7 @@ GET  /api/venues?page=1&limit=20
 GET  /api/venues/:venueId
 ```
 
-The venue read routes only return `status='Active'` and `is_active=true` rows. `/api/user/health` remains a compatibility health check. User and owner authentication/signup are implemented; their general CRUD routes and booking CRUD are not implemented yet. Admin management routes are documented in [docs/admin-api.md](docs/admin-api.md).
+The venue read routes only return `status='Active'` and `is_active=true` rows. `/api/user/health` remains a compatibility health check. User/owner authentication, admin user/owner management and bank account APIs are implemented. Booking CRUD is not implemented yet. Admin security routes are documented in [docs/admin-api.md](docs/admin-api.md).
 
 ## Booking & payment safety notes
 
@@ -138,3 +138,5 @@ Owner signup and email/phone test OTP verification, forgot-password and reset-pa
 ## User authentication
 
 User signup and phone-only OTP login, verification, resend, current-user and logout endpoints are implemented under `/api/user/auth`. Signup creates a pending user; verification creates a separate user session. Apply migration 013. OTP is fixed at `1111` for development and disabled in production. See [User authentication and payloads](docs/user-auth.md) and the separate [User Postman collection](docs/postman/EventMitra.User.postman_collection.json). Run `npm run test:user:integration:local` for isolated PostgreSQL/HTTP tests.
+
+Admin user/owner CRUD and bank account APIs are documented in [People and account APIs](docs/people-and-accounts-api.md). Apply migration 014 for account numbers, branch addresses, five-account limits and contact verification resets. Self-service account updates accept only `is_default`; admins with the corresponding module action can edit details. Profile deletion preserves history. Run `npm run test:people:integration:local` for the new suite.

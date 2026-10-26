@@ -1,5 +1,7 @@
 # User signup and phone OTP authentication
 
+User bank account add/list/get and default-only updates are documented in [People and account APIs](people-and-accounts-api.md). Apply migration 014 before using `/api/user/accounts`.
+
 Run `npm run migrate` before using these endpoints. Migration **013** generates `USR00001` style user codes, adds phone verification and independent user sessions, and changes `user_phone_verification` to use `country_code` + `user_phone_number` with **no `user_id`**. Earlier migration files are unchanged. Historical OTP records retain their phone targets but are expired and consumed.
 
 Base URL: `http://localhost:3600/api/user/auth`. Send `Content-Type: application/json` for JSON bodies.

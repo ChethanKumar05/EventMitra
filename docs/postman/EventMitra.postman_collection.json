@@ -2,7 +2,7 @@
   "info": {
     "name": "EventMitra API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Main-module permission flow: login as your super admin, create role, create admin with that role, create main module, assign per-admin flags, and save the matrix. Login and auth/me return effective module permissions. No submodules. Codes are generated. Credentials remain empty in the local environment. Permission POST accepts an object or array and upserts existing rows. Login accepts email or username. New admins require admin_username. Names and identities are checked for duplicates."
+    "description": "Main-module permission flow: login as your super admin, create role, create admin with that role, create main module, assign per-admin flags, and save the matrix. Login and auth/me return effective module permissions. No submodules. Codes are generated. Credentials remain empty in the local environment. Permission POST accepts an object or array and upserts existing rows. Login accepts email or username. New admins require admin_username. Names and identities are checked for duplicates. Migration 014: admin user/owner CRUD and bank account add/list/get/update are in a separate folder. Ordinary admins require user_management/owner_management module actions; super admins have access."
   },
   "auth": {
     "type": "noauth"
@@ -30,6 +30,26 @@
     },
     {
       "key": "permission_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "managed_user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "managed_user_account_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "managed_owner_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "managed_owner_account_id",
       "value": "",
       "type": "string"
     }
@@ -1520,6 +1540,1214 @@
                 "exec": [
                   "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
                   "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "09 - User and owner management (admin)",
+      "description": "Apply migration 014. Fill managed_* and bank_* variables. This folder logs in again and can be run separately; skip sample DELETE requests if you need the created profiles for self-service tests.",
+      "item": [
+        {
+          "name": "Login before user and owner management",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{admin_login}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "identifier accepts email or username. You may instead send email or username, but provide exactly one login field. Usernames contain no spaces. Set admin_login in the environment; legacy admin_email is used as a fallback."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('run_suffix',Date.now().toString());",
+                  "if (!pm.variables.get('admin_login')) pm.variables.set('admin_login',pm.variables.get('admin_email')||pm.variables.get('admin_username')||'');",
+                  "if (pm.request.body && pm.request.body.mode === 'raw') {",
+                  "  const resolve = value => typeof value === 'string' ? pm.variables.replaceIn(value) : Array.isArray(value) ? value.map(resolve) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolve(child)])) : value;",
+                  "  pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Successful envelope', function () { pm.expect(pm.response.json().status).to.eql(true); });",
+                  "pm.test('Login returns module flags', function () { const data=pm.response.json().data; pm.expect(data.permissions).to.be.an('array'); if(data.permissions.length) pm.expect(data.permissions[0]).to.have.keys('module_id','module_code','module_key','module_name','all','create','read','edit','delete','view'); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Manage users",
+          "description": "Create once per profile. DELETE marks only this sample profile deleted and preserves bank accounts/history. Module key user_management controls ordinary admin access.",
+          "item": [
+            {
+              "name": "Create user",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/users",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"country_code\": \"{{managed_country_code}}\",\n  \"user_phone_number\": \"{{managed_user_phone_number}}\",\n  \"user_name\": \"{{managed_user_name}}\",\n  \"gender\": \"m\",\n  \"email\": \"{{managed_user_email}}\",\n  \"profile_image\": null,\n  \"whatsapp_number\": null,\n  \"alternative_number\": null,\n  \"status\": \"pending\",\n  \"is_active\": true,\n  \"reason\": null\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(pm.request.body&&pm.request.body.mode==='raw'){",
+                      " const resolve=value=>typeof value==='string'?pm.variables.replaceIn(value):Array.isArray(value)?value.map(resolve):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,child])=>[key,resolve(child)])):value;",
+                      " pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                      "if(pm.response.code<300){pm.collectionVariables.set('managed_user_id',pm.response.json().data.user_id);}"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "List users - pagination, search, filters, sorting",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/users?page=1&limit=20",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "users"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "search_column",
+                      "value": "all",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "sort_by",
+                      "value": "user_id",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "sort_order",
+                      "value": "asc",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "user_id",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "user_code",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "user_name",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "country_code",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "user_phone_number",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "email",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "gender",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "status",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "is_active",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "is_phone_number_verified",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "created_at",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "updated_at",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "Get user by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/users/{{managed_user_id}}"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "Update user profile",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/users/{{managed_user_id}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"user_name\": \"{{managed_user_name}}\",\n  \"status\": \"verified\",\n  \"is_active\": true,\n  \"reason\": \"Reviewed\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(pm.request.body&&pm.request.body.mode==='raw'){",
+                      " const resolve=value=>typeof value==='string'?pm.variables.replaceIn(value):Array.isArray(value)?value.map(resolve):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,child])=>[key,resolve(child)])):value;",
+                      " pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "Add user bank account",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/users/{{managed_user_id}}/accounts",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_number\": \"{{bank_account_number}}\",\n  \"account_holder_name\": \"{{bank_account_holder_name}}\",\n  \"ifsc_code\": \"{{bank_ifsc_code}}\",\n  \"branch_name\": \"{{bank_branch_name}}\",\n  \"branch_address\": \"{{bank_branch_address}}\",\n  \"passbook_image\": null,\n  \"is_default\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(pm.request.body&&pm.request.body.mode==='raw'){",
+                      " const resolve=value=>typeof value==='string'?pm.variables.replaceIn(value):Array.isArray(value)?value.map(resolve):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,child])=>[key,resolve(child)])):value;",
+                      " pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                      "if(pm.response.code<300){pm.collectionVariables.set('managed_user_account_id',pm.response.json().data.user_account_id);}"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "List user bank accounts",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/users/{{managed_user_id}}/accounts?page=1&limit=20",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "users",
+                    "{{managed_user_id}}",
+                    "accounts"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "search_column",
+                      "value": "all",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "sort_by",
+                      "value": "user_account_id",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "sort_order",
+                      "value": "asc",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "user_account_id",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "account_number",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "account_holder_name",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "ifsc_code",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "branch_name",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "branch_address",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "is_default",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "created_at",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "updated_at",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "Get user bank account by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/users/{{managed_user_id}}/accounts/{{managed_user_account_id}}"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "Admin update user bank details",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/users/{{managed_user_id}}/accounts/{{managed_user_account_id}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_holder_name\": \"{{bank_account_holder_name}}\",\n  \"account_number\": \"{{bank_account_number}}\",\n  \"ifsc_code\": \"{{bank_ifsc_code}}\",\n  \"branch_name\": \"{{bank_branch_name}}\",\n  \"branch_address\": \"{{bank_branch_address}}\",\n  \"passbook_image\": null,\n  \"is_default\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(pm.request.body&&pm.request.body.mode==='raw'){",
+                      " const resolve=value=>typeof value==='string'?pm.variables.replaceIn(value):Array.isArray(value)?value.map(resolve):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,child])=>[key,resolve(child)])):value;",
+                      " pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "Mark sample user deleted - preserves history",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/users/{{managed_user_id}}"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Manage owners",
+          "description": "Create once per profile. DELETE marks only this sample profile deleted and preserves bank accounts/history. Module key owner_management controls ordinary admin access.",
+          "item": [
+            {
+              "name": "Create owner",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/owners",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"country_code\": \"{{managed_country_code}}\",\n  \"owner_phone_number\": \"{{managed_owner_phone_number}}\",\n  \"owner_name\": \"{{managed_owner_name}}\",\n  \"email\": \"{{managed_owner_email}}\",\n  \"password\": \"{{managed_owner_password}}\",\n  \"gender\": \"f\",\n  \"alternative_number\": null,\n  \"profile_image\": null,\n  \"alternative_email\": null,\n  \"whatsapp_number\": null,\n  \"doc_type\": \"passport\",\n  \"doc_number\": \"REPLACE_WITH_DOCUMENT_NUMBER\",\n  \"doc_image\": \"/uploads/owner-document.jpg\",\n  \"pin_code\": \"560001\",\n  \"state\": \"Karnataka\",\n  \"city\": \"Bengaluru\",\n  \"area\": \"Central\",\n  \"lat\": 12.9716,\n  \"long\": 77.5946,\n  \"address\": \"REPLACE_WITH_ADDRESS\",\n  \"status\": \"pending\",\n  \"kyc_verification\": false,\n  \"reason\": null\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(pm.request.body&&pm.request.body.mode==='raw'){",
+                      " const resolve=value=>typeof value==='string'?pm.variables.replaceIn(value):Array.isArray(value)?value.map(resolve):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,child])=>[key,resolve(child)])):value;",
+                      " pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                      "if(pm.response.code<300){pm.collectionVariables.set('managed_owner_id',pm.response.json().data.owner_id);}"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "List owners - pagination, search, filters, sorting",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/owners?page=1&limit=20",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "owners"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "search_column",
+                      "value": "all",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "sort_by",
+                      "value": "owner_id",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "sort_order",
+                      "value": "asc",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "owner_id",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "owner_code",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "owner_name",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "country_code",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "owner_phone_number",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "email",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "gender",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "status",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "kyc_verification",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "is_email_verified",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "city",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "state",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "area",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "is_phone_number_verified",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "created_at",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "updated_at",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "Get owner by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/owners/{{managed_owner_id}}"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "Update owner profile",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/owners/{{managed_owner_id}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"owner_name\": \"{{managed_owner_name}}\",\n  \"status\": \"verified\",\n  \"kyc_verification\": true,\n  \"reason\": \"Reviewed\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(pm.request.body&&pm.request.body.mode==='raw'){",
+                      " const resolve=value=>typeof value==='string'?pm.variables.replaceIn(value):Array.isArray(value)?value.map(resolve):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,child])=>[key,resolve(child)])):value;",
+                      " pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "Add owner bank account",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/owners/{{managed_owner_id}}/accounts",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_number\": \"{{bank_account_number}}\",\n  \"account_holder_name\": \"{{bank_account_holder_name}}\",\n  \"ifsc_code\": \"{{bank_ifsc_code}}\",\n  \"branch_name\": \"{{bank_branch_name}}\",\n  \"branch_address\": \"{{bank_branch_address}}\",\n  \"passbook_image\": null,\n  \"is_default\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(pm.request.body&&pm.request.body.mode==='raw'){",
+                      " const resolve=value=>typeof value==='string'?pm.variables.replaceIn(value):Array.isArray(value)?value.map(resolve):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,child])=>[key,resolve(child)])):value;",
+                      " pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                      "if(pm.response.code<300){pm.collectionVariables.set('managed_owner_account_id',pm.response.json().data.owner_account_id);}"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "List owner bank accounts",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/owners/{{managed_owner_id}}/accounts?page=1&limit=20",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "owners",
+                    "{{managed_owner_id}}",
+                    "accounts"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "search_column",
+                      "value": "all",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "sort_by",
+                      "value": "owner_account_id",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "sort_order",
+                      "value": "asc",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "owner_account_id",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "account_number",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "account_holder_name",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "ifsc_code",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "branch_name",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "branch_address",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "is_default",
+                      "value": "true",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "created_at",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    },
+                    {
+                      "key": "updated_at",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Optional. Enable in Params; filters combine with AND."
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "Get owner bank account by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/owners/{{managed_owner_id}}/accounts/{{managed_owner_account_id}}"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "Admin update owner bank details",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/owners/{{managed_owner_id}}/accounts/{{managed_owner_account_id}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_holder_name\": \"{{bank_account_holder_name}}\",\n  \"account_number\": \"{{bank_account_number}}\",\n  \"ifsc_code\": \"{{bank_ifsc_code}}\",\n  \"branch_name\": \"{{bank_branch_name}}\",\n  \"branch_address\": \"{{bank_branch_address}}\",\n  \"passbook_image\": null,\n  \"is_default\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(pm.request.body&&pm.request.body.mode==='raw'){",
+                      " const resolve=value=>typeof value==='string'?pm.variables.replaceIn(value):Array.isArray(value)?value.map(resolve):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,child])=>[key,resolve(child)])):value;",
+                      " pm.request.body.update(JSON.stringify(resolve(JSON.parse(pm.request.body.raw))));",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            },
+            {
+              "name": "Mark sample owner deleted - preserves history",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/api/admin/owners/{{managed_owner_id}}"
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                    ]
+                  }
+                }
+              ],
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Logout after people management",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
                 ]
               }
             }

@@ -83,3 +83,7 @@ to created_at descending then venue_id descending. Null sort values are placed l
 [Postman collection](postman/EventMitra.postman_collection.json) exposes disabled optional search,
 column, sort and filter parameters in Params. Enable only the parameters you need. The sample
 screens provide the same controls, including sortable headers and Clear All.
+
+## User/owner and bank account lists
+
+The new admin user/owner lists and authenticated bank account lists support pagination, column search, exact filters and sorting. See [People and account list documentation](people-and-accounts-api.md#pagination-search-filters-and-sorting) for supported columns and examples.

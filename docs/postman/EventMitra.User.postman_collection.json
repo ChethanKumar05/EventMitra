@@ -2,7 +2,7 @@
   "info": {
     "name": "EventMitra - User API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "User signup, phone-only OTP login, verify, resend, current user and logout. Apply migration 013. Select User Local environment and fill country_code, user_phone_number, user_name. Optional email may stay empty. Signup creates a pending user without a session. Login/resend return a challenge; verify establishes the user session cookie. Test OTP 1111; no SMS delivery is connected and OTP endpoints are disabled in production. Signup once; for existing users skip Signup. Keep the cookie jar enabled. Unknown/ineligible phones receive the same challenge response but cannot authenticate."
+    "description": "User signup, phone-only OTP login, verify, resend, current user and logout. Apply migration 013. Select User Local environment and fill country_code, user_phone_number, user_name. Optional email may stay empty. Signup creates a pending user without a session. Login/resend return a challenge; verify establishes the user session cookie. Test OTP 1111; no SMS delivery is connected and OTP endpoints are disabled in production. Signup once; for existing users skip Signup. Keep the cookie jar enabled. Unknown/ineligible phones receive the same challenge response but cannot authenticate. Bank account add/list/get and default-only update are included; apply migration 014 and fill bank_* environment fields."
   },
   "auth": {
     "type": "noauth"
@@ -389,7 +389,342 @@
       ]
     },
     {
-      "name": "05 - Logout",
+      "name": "05 - Bank accounts (logs in first)",
+      "description": "Apply migration 014. Fill bank_* environment values. Each run adds one account and counts toward the five-account limit. Self-service update accepts only is_default. Login uses existing profile; no signup here.",
+      "item": [
+        {
+          "name": "Login before managing bank accounts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"country_code\": \"{{country_code}}\",\n  \"user_phone_number\": \"{{user_phone_number}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Response status',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "if(pm.response.code===200){pm.collectionVariables.set('otp_token',pm.response.json().data.otp_token);}",
+                  "if(pm.response.code<300){pm.collectionVariables.set('otp_token',pm.response.json().data.otp_token);}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify login OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/verify-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"1111\",\n  \"otp_token\": \"{{otp_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Add bank account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_number\": \"{{bank_account_number}}\",\n  \"account_holder_name\": \"{{bank_account_holder_name}}\",\n  \"ifsc_code\": \"{{bank_ifsc_code}}\",\n  \"branch_name\": \"{{bank_branch_name}}\",\n  \"branch_address\": \"{{bank_branch_address}}\",\n  \"passbook_image\": null,\n  \"is_default\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                  "if(pm.response.code<300){pm.collectionVariables.set('user_account_id',pm.response.json().data.user_account_id);}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "List my bank accounts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/accounts?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "search_column",
+                  "value": "all",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "sort_by",
+                  "value": "user_account_id",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "sort_order",
+                  "value": "asc",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "user_account_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "account_number",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "account_holder_name",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "ifsc_code",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "branch_name",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "branch_address",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "is_default",
+                  "value": "true",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "created_at",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                },
+                {
+                  "key": "updated_at",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params; filters combine with AND."
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get my bank account by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/accounts/{{user_account_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Set my default account - only is_default allowed",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/accounts/{{user_account_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_default\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Logout after bank accounts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/user/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06 - Logout",
       "item": [
         {
           "name": "Logout current user",
@@ -473,6 +808,11 @@
     },
     {
       "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_account_id",
       "value": "",
       "type": "string"
     }
