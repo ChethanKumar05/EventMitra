@@ -1,5 +1,11 @@
 # EventMitra Postman setup
 
+Owner/Admin venue folders now include three GET price dropdowns before price creation: `/:venueId/type-slots/dropdown`, `/:venueId/decorations/dropdown`, `/:venueId/meals/dropdown`. They return `data` arrays with `value`, `label` and relevant pricing fields. No body is needed; venue ID is in the URL. See [Price dropdown documentation](../venue-management-api.md#price-dropdowns).
+
+Venue slot/decoration/meal/price save requests use one POST endpoint per resource. Create bodies set the record ID to null (omission also works); update bodies send the existing `venue_type_slot_id`, `venue_decoration_id`, `venue_meals_id` or `venue_price_id`. The venue ID remains in the URL. The separate child PUT routes are removed. Reimport Owner/Admin collections for these bodies. Creation returns 201 and updates 200; GET venue detail returns existing row IDs. See [Frontend record selection](../venue-management-api.md#frontend-record-selection).
+
+Migration 015 adds owner/admin venue management. Reimport the Owner and Admin collections/environments. Their new venue folders log in first, capture venue/slot/package IDs, and demonstrate full-detail APIs. Set `venue_name`; admins also set `venue_owner_id` from the paginated owner dropdown. Ordinary admins need `venue_management` action grants. Owner edits to Active venues return them to Pending. See [Venue API payloads](../venue-management-api.md). Run the venue folder separately against existing credentials; admin sample cleanup is optional.
+
 Migration 014 adds admin user/owner management and bank accounts. Reimport all three collections and environments. The admin collection has new managed-profile/account folders. The user and owner collections have separate bank-account folders that log in first. Fill the new bank fields in the corresponding environment. Self-service PUT sends only `is_default`; admin PUT can edit bank details. See [People/account payloads and permissions](../people-and-accounts-api.md). Repeated adds count toward the five-account limit; profile deletion samples preserve history.
 
 1. Import `EventMitra.postman_collection.json` and `EventMitra.local.postman_environment.json`.

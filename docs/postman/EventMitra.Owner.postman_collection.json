@@ -2,7 +2,7 @@
   "info": {
     "name": "EventMitra - Owner API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Signup, test OTP verification, login/logout, and password recovery. Signup first creates a pending owner; names must be unique. Test OTP is 1111 and real email/SMS delivery is not connected. OTPs are disabled in production. Reset uses a verified password-reset token, not a general verification token. Run signup once; use existing-account auth folders separately afterward. Bank account add/list/get and default-only update are included; apply migration 014 and fill bank_* environment fields."
+    "description": "Signup, test OTP verification, login/logout, and password recovery. Signup first creates a pending owner; names must be unique. Test OTP is 1111 and real email/SMS delivery is not connected. OTPs are disabled in production. Reset uses a verified password-reset token, not a general verification token. Run signup once; use existing-account auth folders separately afterward. Bank account add/list/get and default-only update are included; apply migration 014 and fill bank_* environment fields. Migration 015 venue/configuration APIs are included in a separate folder; set venue_name and admin venue_owner_id. Slots, decorations, meals and prices now use a single POST save endpoint with an optional record ID for updates. Null venue child record IDs create new rows; populated IDs update existing rows. Separate child PUT routes are removed. Three venue-scoped price dropdowns provide slot, decoration and meal options."
   },
   "auth": {
     "type": "noauth"
@@ -1134,6 +1134,998 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "09 - My venues and configuration (owner)",
+      "description": "Apply migration 015. Run separately with existing credentials. Set venue_name; admin also selects venue_owner_id from the dropdown. Creates a venue, two slots, singleton amenities, decoration, two meals and linked prices. Owner edits to approved venues require review. Admin actions use venue_management module grants.",
+      "item": [
+        {
+          "name": "Owner login before venue management",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Use an existing pending or verified owner with an app-generated scrypt-v1 password hash. Owner names may contain spaces and are unique after case/whitespace normalization."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Envelope',function(){pm.expect(pm.response.json().status).to.eql(true);});",
+                  "pm.test('Safe owner identity',function(){const owner=pm.response.json().data;pm.expect(owner.owner_id).to.be.a('string');pm.expect(['pending','verified']).to.include(owner.status);pm.expect(owner).to.not.have.property('password');pm.expect(owner).to.not.have.property('doc_json');});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create venue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_name\": \"{{venue_name}}\",\n  \"venue_hall_capacity\": 300,\n  \"venue_dining_capacity\": 100,\n  \"venue_available_rooms_count\": 5,\n  \"venue_images\": [\n    \"/uploads/hall.jpg\"\n  ],\n  \"venue_documents\": [\n    \"/uploads/venue-proof.pdf\"\n  ],\n  \"pin_code\": \"560001\",\n  \"state\": \"Karnataka\",\n  \"city\": \"Bengaluru\",\n  \"area\": \"Central\",\n  \"lat\": 12.9716,\n  \"long\": 77.5946,\n  \"venue_number\": \"+919876543210\",\n  \"venue_alternative_number\": null,\n  \"venue_website_url\": \"https://example.com/hall\",\n  \"email\": \"hall@example.com\",\n  \"venue_parking_capacity\": 30,\n  \"venue_length\": \"100.50\",\n  \"venue_width\": \"50.00\",\n  \"venue_height\": \"15.00\",\n  \"refund_policy\": [\n    \"Refund terms\"\n  ],\n  \"cancellation_policy\": [\n    \"Cancellation terms\"\n  ],\n  \"description\": \"Sample venue description\",\n  \"is_active\": true,\n  \"is_cancellation_availble\": true,\n  \"venue_year_established\": 2020\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                  "if(pm.response.code<300)pm.collectionVariables.set('venue_id',pm.response.json().data.venue_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "List only my venues",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/owner/venues?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "owner",
+                "venues"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "search_column",
+                  "value": "all",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "sort_by",
+                  "value": "venue_id",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "sort_order",
+                  "value": "asc",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "venue_id",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "venue_code",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "venue_name",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "venue_hall_capacity",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "venue_dining_capacity",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "venue_available_rooms_count",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "venue_parking_capacity",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "pin_code",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "state",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "city",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "area",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "venue_number",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "email",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "is_active",
+                  "value": "true",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "is_cancellation_availble",
+                  "value": "true",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "venue_year_established",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "created_at",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "updated_at",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "min_capacity",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                },
+                {
+                  "key": "max_capacity",
+                  "value": "",
+                  "disabled": true,
+                  "description": "Optional. Enable in Params and set a value. Filters combine with AND."
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get venue including empty configuration",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Update my venue",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_hall_capacity\": 350,\n  \"description\": \"Updated sample venue\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Create morning slot",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/type-slots",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_type_slot_id\": null,\n  \"slot_name\": \"Morning\",\n  \"from_time\": \"08:00\",\n  \"to_time\": \"16:00\",\n  \"description\": \"Morning events\",\n  \"is_active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Single POST save: venue_type_slot_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                  "if(pm.response.code<300)pm.collectionVariables.set('venue_type_slot_id',pm.response.json().data.venue_type_slot_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Create overnight slot",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/type-slots",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_type_slot_id\": null,\n  \"slot_name\": \"Evening\",\n  \"from_time\": \"18:00\",\n  \"to_time\": \"06:00\",\n  \"description\": \"Overnight events\",\n  \"is_active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Single POST save: venue_type_slot_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                  "if(pm.response.code<300)pm.collectionVariables.set('venue_evening_slot_id',pm.response.json().data.venue_type_slot_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Update morning slot (POST save)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/type-slots",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_type_slot_id\": \"{{venue_type_slot_id}}\",\n  \"slot_name\": \"Morning Updated\",\n  \"description\": \"Updated morning slot\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Single POST save: venue_type_slot_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Updated existing record',function(){pm.expect(pm.response.json().message).to.eql('Venue record updated');});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Create amenities - singleton upsert",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/amenities",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_chairs_available\": true,\n  \"is_ac_available\": true,\n  \"is_fan_available\": true,\n  \"is_guest_room_available\": false,\n  \"is_parking_available\": true,\n  \"is_washroom_available\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Update existing amenities",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/amenities",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_guest_room_available\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Create decoration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/decorations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_decoration_id\": null,\n  \"venue_decoration_name\": \"Flower decoration\",\n  \"venue_decoration_images\": [\n    \"/uploads/flowers.jpg\"\n  ],\n  \"venue_decoration_price\": \"10000.00\",\n  \"venue_decoration_advance_price\": \"1000.00\",\n  \"advance_return_within_date\": null,\n  \"is_cancellation_availble\": true,\n  \"cancelation_policy\": [\n    \"Cancellation terms\"\n  ],\n  \"return_policy\": [\n    \"Return terms\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Single POST save: venue_decoration_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                  "if(pm.response.code<300)pm.collectionVariables.set('venue_decoration_id',pm.response.json().data.venue_decoration_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Update decoration (POST save)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/decorations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_decoration_id\": \"{{venue_decoration_id}}\",\n  \"venue_decoration_price\": \"12000.00\",\n  \"venue_decoration_advance_price\": \"1500.00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Single POST save: venue_decoration_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Updated existing record',function(){pm.expect(pm.response.json().message).to.eql('Venue record updated');});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Create vegetarian meals",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/meals",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_meals_id\": null,\n  \"meal_deatails\": [\n    \"Rice\",\n    \"Curry\",\n    \"Dessert\"\n  ],\n  \"is_veg\": true,\n  \"is_non_veg\": false,\n  \"per_plate_price\": \"300.00\",\n  \"meals_advance_price\": \"1000.00\",\n  \"advance_return_within_date\": null,\n  \"is_cancellation_availble\": true,\n  \"cancelation_policy\": [\n    \"Cancellation terms\"\n  ],\n  \"return_policy\": [\n    \"Return terms\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Single POST save: venue_meals_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                  "if(pm.response.code<300)pm.collectionVariables.set('venue_meals_id',pm.response.json().data.venue_meals_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Create nonvegetarian meals - second record",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/meals",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_meals_id\": null,\n  \"meal_deatails\": [\n    \"Rice\",\n    \"Chicken curry\"\n  ],\n  \"is_veg\": false,\n  \"is_non_veg\": true,\n  \"per_plate_price\": \"450.00\",\n  \"meals_advance_price\": \"1000.00\",\n  \"advance_return_within_date\": null,\n  \"is_cancellation_availble\": true,\n  \"cancelation_policy\": [\n    \"Cancellation terms\"\n  ],\n  \"return_policy\": [\n    \"Return terms\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Single POST save: venue_meals_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                  "if(pm.response.code<300)pm.collectionVariables.set('venue_nonveg_meals_id',pm.response.json().data.venue_meals_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Update vegetarian meals (POST save)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/meals",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_meals_id\": \"{{venue_meals_id}}\",\n  \"per_plate_price\": \"325.00\",\n  \"meal_deatails\": [\n    \"Rice\",\n    \"Curry\",\n    \"Dessert\",\n    \"Soup\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Single POST save: venue_meals_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Updated existing record',function(){pm.expect(pm.response.json().message).to.eql('Venue record updated');});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Venue type slots dropdown for price",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/type-slots/dropdown",
+            "description": "Dropdown options for the selected venue. No body or query parameters. Response data is an array containing value (record ID), label and relevant fields. Owner scope or admin venue_management Read/View/All is required."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Dropdown options',function(){const data=pm.response.json().data;pm.expect(data).to.be.an('array');data.forEach(option=>{pm.expect(option.value).to.be.a('string');pm.expect(option.label).to.be.a('string');});});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Venue decorations dropdown for price",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/decorations/dropdown",
+            "description": "Dropdown options for the selected venue. No body or query parameters. Response data is an array containing value (record ID), label and relevant fields. Owner scope or admin venue_management Read/View/All is required."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Dropdown options',function(){const data=pm.response.json().data;pm.expect(data).to.be.an('array');data.forEach(option=>{pm.expect(option.value).to.be.a('string');pm.expect(option.label).to.be.a('string');});});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Venue meals dropdown for price",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/meals/dropdown",
+            "description": "Dropdown options for the selected venue. No body or query parameters. Response data is an array containing value (record ID), label and relevant fields. Owner scope or admin venue_management Read/View/All is required."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Dropdown options',function(){const data=pm.response.json().data;pm.expect(data).to.be.an('array');data.forEach(option=>{pm.expect(option.value).to.be.a('string');pm.expect(option.label).to.be.a('string');});});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create linked morning price",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/prices",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_price_id\": null,\n  \"venue_type_slot_id\": \"{{venue_type_slot_id}}\",\n  \"venue_from_date\": \"2027-01-01\",\n  \"venue_to_date\": \"2027-12-31\",\n  \"venue_from_time\": \"08:00\",\n  \"venue_to_time\": \"16:00\",\n  \"venue_price\": \"25000.00\",\n  \"venue_advance_price\": \"2500.00\",\n  \"venue_decoration_id\": \"{{venue_decoration_id}}\",\n  \"venue_decoration_from_date\": null,\n  \"venue_decoration_to_date\": null,\n  \"venue_decoration_from_time\": null,\n  \"venue_decoration_to_time\": null,\n  \"venue_meals_id\": \"{{venue_meals_id}}\",\n  \"venue_meals_from_date\": null,\n  \"venue_meals_to_date\": null,\n  \"venue_meals_from_time\": null,\n  \"venue_meals_to_time\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Single POST save: venue_price_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                  "if(pm.response.code<300)pm.collectionVariables.set('venue_price_id',pm.response.json().data.venue_price_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Create linked evening price",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/prices",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_price_id\": null,\n  \"venue_type_slot_id\": \"{{venue_evening_slot_id}}\",\n  \"venue_from_date\": \"2027-01-01\",\n  \"venue_to_date\": \"2027-12-31\",\n  \"venue_from_time\": \"18:00\",\n  \"venue_to_time\": \"06:00\",\n  \"venue_price\": \"30000.00\",\n  \"venue_advance_price\": \"2500.00\",\n  \"venue_decoration_id\": \"{{venue_decoration_id}}\",\n  \"venue_decoration_from_date\": null,\n  \"venue_decoration_to_date\": null,\n  \"venue_decoration_from_time\": null,\n  \"venue_decoration_to_time\": null,\n  \"venue_meals_id\": \"{{venue_nonveg_meals_id}}\",\n  \"venue_meals_from_date\": null,\n  \"venue_meals_to_date\": null,\n  \"venue_meals_from_time\": null,\n  \"venue_meals_to_time\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Single POST save: venue_price_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201',function(){pm.response.to.have.status(201);});",
+                  "if(pm.response.code<300)pm.collectionVariables.set('venue_evening_price_id',pm.response.json().data.venue_price_id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Update morning price (POST save)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/prices",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_price_id\": \"{{venue_price_id}}\",\n  \"venue_price\": \"27500.00\",\n  \"venue_advance_price\": \"3000.00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Single POST save: venue_price_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('Updated existing record',function(){pm.expect(pm.response.json().message).to.eql('Venue record updated');});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get complete venue configuration",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
+                  "pm.test('All configuration tables returned',function(){const data=pm.response.json().data;['venue_type_slots','venue_price_details','venue_decoration_details','venue_meals_details'].forEach(key=>pm.expect(data[key]).to.be.an('array'));pm.expect(data.venue_aminites).to.be.an('object');});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Logout after venue flow",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
     }
   ],
   "event": [
@@ -1168,6 +2160,46 @@
     },
     {
       "key": "owner_account_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "venue_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "venue_type_slot_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "venue_evening_slot_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "venue_decoration_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "venue_meals_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "venue_nonveg_meals_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "venue_price_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "venue_evening_price_id",
       "value": "",
       "type": "string"
     }

@@ -1,10 +1,12 @@
 import * as signup from '../controllers/ownerSignupController';
 import { bankAccountController } from '../controllers/bankAccountController';
+import ownerVenueRoutes from './ownerVenueRoutes';
 import { Router } from 'express';
 import * as auth from '../controllers/ownerAuthController';
 import { authenticateOwner,ownerAuthHeaders } from '../middleware/ownerAuth';
 const router=Router();
 router.use(ownerAuthHeaders);
+router.use('/venues',ownerVenueRoutes);
 router.post('/auth/signup',signup.signup);
 router.post('/auth/send-otp',signup.sendOtp);
 router.post('/auth/verify-otp',signup.verifyOtp);

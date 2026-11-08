@@ -1,5 +1,7 @@
 # List APIs: pagination, column search, filters and sorting
 
+Owner/admin venue lists and the admin venue owner dropdown are documented in [Venue list APIs](venue-management-api.md#full-detail-and-lists). They include owner scoping, admin owner filters, pagination, column search, exact filters and sorting. Public venue read behavior below is unchanged.
+
 Lists are GET requests with no body. All use `page` (1-1000000, default 1), `limit`
 (1-100, default 20), `search` (max 200), `search_column`, `sort_by` and `sort_order` (`asc`/`desc`).
 `search_column=all` searches all listed fields; selecting a column restricts search to it.

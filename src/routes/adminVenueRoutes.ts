@@ -1,0 +1,28 @@
+import { Router } from 'express';
+import { venueManagementController } from '../controllers/venueManagementController';
+import { authenticateAdmin, securityHeaders } from '../middleware/adminAuth';
+import { requireManagementPermission } from '../middleware/managementAuth';
+import { requireVenuePartSavePermission } from '../middleware/venueManagementAuth';
+
+const router = Router(), venues = venueManagementController(true);
+router.use(securityHeaders, authenticateAdmin);
+router.get('/owners', requireManagementPermission('venue', 'read'), venues.owners);
+router.post('/', requireManagementPermission('venue', 'create'), venues.create);
+router.get('/', requireManagementPermission('venue', 'read'), venues.list);
+router.get('/:venueId', requireManagementPermission('venue', 'read'), venues.get);
+router.put('/:venueId', requireManagementPermission('venue', 'edit'), venues.update);
+router.delete('/:venueId', requireManagementPermission('venue', 'delete'), venues.remove);
+router.get('/:venueId/type-slots/dropdown', requireManagementPermission('venue', 'read'), venues.priceDropdown('type-slots'));
+router.get('/:venueId/decorations/dropdown', requireManagementPermission('venue', 'read'), venues.priceDropdown('decorations'));
+router.get('/:venueId/meals/dropdown', requireManagementPermission('venue', 'read'), venues.priceDropdown('meals'));
+router.post('/:venueId/type-slots', requireVenuePartSavePermission('type-slots'), venues.savePart('type-slots'));
+router.delete('/:venueId/type-slots/:partId', requireManagementPermission('venue', 'delete'), venues.removePart('type-slots'));
+router.put('/:venueId/amenities', requireManagementPermission('venue', 'edit'), venues.savePart('amenities'));
+router.delete('/:venueId/amenities', requireManagementPermission('venue', 'delete'), venues.removePart('amenities'));
+router.post('/:venueId/prices', requireVenuePartSavePermission('prices'), venues.savePart('prices'));
+router.delete('/:venueId/prices/:partId', requireManagementPermission('venue', 'delete'), venues.removePart('prices'));
+router.post('/:venueId/decorations', requireVenuePartSavePermission('decorations'), venues.savePart('decorations'));
+router.delete('/:venueId/decorations/:partId', requireManagementPermission('venue', 'delete'), venues.removePart('decorations'));
+router.post('/:venueId/meals', requireVenuePartSavePermission('meals'), venues.savePart('meals'));
+router.delete('/:venueId/meals/:partId', requireManagementPermission('venue', 'delete'), venues.removePart('meals'));
+export default router;

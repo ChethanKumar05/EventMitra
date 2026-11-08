@@ -1,5 +1,7 @@
 # Owner login and logout
 
+Authenticated owner venue creation, updates, scoped lists and full configuration detail are documented in [Venue management](venue-management-api.md). Apply migration 015 before using `/api/owner/venues`.
+
 Owner authentication is separate from admin authentication. Login, logout and current-owner endpoints are implemented, along with signup, test OTP verification and password recovery described in [owner signup/OTP flows](owner-signup-otp.md). Admin owner management and owner bank account APIs are documented in [People and account APIs](people-and-accounts-api.md). No owner profiles or default credentials are created by migrations.
 
 Apply pending migrations using `npm run migrate`, then start with `npm run dev`.

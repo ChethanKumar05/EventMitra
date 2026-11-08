@@ -103,6 +103,26 @@ test('PostgreSQL security API integration', { skip: !url && 'Set TEST_DATABASE_U
       const bank=(await upgrade.query(`SELECT * FROM public.${kind}_account_details WHERE ${kind}_account_id=$1`,['legacy-'+kind+'-account'])).rows[0];
       assert.equal(bank.account_number,null); assert.equal(bank.branch_address,null); assert.equal(bank.is_default,true); assert.ok(bank.updated_at);
     }
+    await require('../dist/migrations/004_venue_migration').venueMigration(upgrade);
+    await upgrade.query(`INSERT INTO public.venue_details(venue_id,venue_code,owner_id,venue_name) VALUES
+      ('legacy-venue-a','VEN00020','old-owner','Legacy A'),('legacy-venue-b','VEN00021','old-owner-2','Legacy B')`);
+    await upgrade.query(`INSERT INTO public.venue_type_slots(venue_type_slot_id,venue_id,slot_name,from_time,to_time)
+      VALUES ('legacy-slot','legacy-venue-a','Morning','08:00','16:00')`);
+    await upgrade.query(`INSERT INTO public.venue_decoration_details(venue_decoration_id,venue_decoration_code,venue_id,venue_decoration_name)
+      VALUES ('legacy-decoration','DEC00010','legacy-venue-b','Legacy flowers')`);
+    await upgrade.query(`INSERT INTO public.venue_price_details(venue_price_id,venue_id,venue_from_date,venue_to_date,venue_from_time,venue_to_time,venue_price,venue_decoration_id)
+      VALUES ('legacy-price','legacy-venue-a','2027-01-01','2027-12-31','08:00','16:00',1000,'legacy-decoration')`);
+    for(let i=0;i<3;i++)await upgrade.query('INSERT INTO public.venue_meals_details(venue_meals_id,venue_id) VALUES($1,$2)',['legacy-meal-'+i,'legacy-venue-a']);
+    const venueUpgrade=require('../dist/migrations/015_venue_management_migration').venueManagementMigration;
+    await assert.rejects(venueUpgrade(upgrade),/more than two meal records/);
+    await upgrade.query("DELETE FROM public.venue_meals_details WHERE venue_meals_id='legacy-meal-2'");
+    await assert.rejects(venueUpgrade(upgrade),/cross-venue price/);
+    await upgrade.query("UPDATE public.venue_price_details SET venue_decoration_id=null WHERE venue_price_id='legacy-price'");
+    await venueUpgrade(upgrade);
+    assert.equal((await upgrade.query("SELECT venue_type_slot_id FROM public.venue_price_details WHERE venue_price_id='legacy-price'")).rows[0].venue_type_slot_id,null,'Legacy prices are preserved for explicit slot assignment');
+    assert.equal((await upgrade.query("SELECT count(*)::int AS n FROM public.venue_meals_details WHERE venue_id='legacy-venue-a'")).rows[0].n,2);
+    assert.equal((await upgrade.query("INSERT INTO public.venue_details(venue_id,owner_id,venue_name) VALUES ('next-venue','old-owner','Next') RETURNING venue_code")).rows[0].venue_code,'VEN00022');
+    assert.equal((await upgrade.query("INSERT INTO public.venue_decoration_details(venue_decoration_id,venue_id,venue_decoration_name) VALUES ('next-decoration','legacy-venue-a','Next') RETURNING venue_decoration_code")).rows[0].venue_decoration_code,'DEC00011');
   } finally { await upgrade.query('ROLLBACK'); upgrade.release(); }
   await runMigrations();
   const existing = await pool.query('SELECT count(*)::int AS n FROM public.admin');

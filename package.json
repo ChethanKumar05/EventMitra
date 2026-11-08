@@ -20,7 +20,9 @@
     "test:user:integration": "npm run build && node --test tests/user-auth.integration.test.cjs",
     "test:user:integration:local": "npm run build && node tests/run-local-integration.cjs user",
     "test:people:integration": "npm run build && node --test tests/people-accounts.integration.test.cjs",
-    "test:people:integration:local": "npm run build && node tests/run-local-integration.cjs people"
+    "test:people:integration:local": "npm run build && node tests/run-local-integration.cjs people",
+    "test:venue:integration": "npm run build && node --test tests/venue-management.integration.test.cjs",
+    "test:venue:integration:local": "npm run build && node tests/run-local-integration.cjs venue"
   },
   "dependencies": {
     "compression": "^1.8.1",

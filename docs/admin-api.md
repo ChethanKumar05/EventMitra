@@ -1,5 +1,7 @@
 # Admin API: roles, admins, main modules and per-admin permissions
 
+Admin venue CRUD, owner dropdown and configuration management use the `venue_management` module. See [Venue API routes and payloads](venue-management-api.md).
+
 Admin user/owner CRUD and bank account APIs are documented in [People and account APIs](people-and-accounts-api.md). They use `user_management` and `owner_management` module actions. The security-management rules below remain unchanged.
 
 Run `npm run migrate`, then `npm run admin:bootstrap` in an interactive terminal to create

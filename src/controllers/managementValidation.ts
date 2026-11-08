@@ -86,7 +86,7 @@ export function defaultAccountInput(value: unknown): AccountInput {
   return { is_default: body.is_default };
 }
 
-export function managementListQuery(query: Request['query'], columns: readonly string[]): ManagementListQuery {
+export function managementListQuery(query: Request['query'], columns: readonly string[], statusValues: readonly string[] = statuses): ManagementListQuery {
   const allowed = ['page', 'limit', 'search', 'search_column', 'sort_by', 'sort_order', ...columns];
   for (const key of Object.keys(query)) if (!allowed.includes(key)) httpError(400, `Unsupported query parameter: ${key}`);
   const scalar = (key: string, max = 200): string | undefined => {
@@ -107,7 +107,7 @@ export function managementListQuery(query: Request['query'], columns: readonly s
     const value = scalar(column, column === 'branch_address' ? 2000 : 200);
     if (value === undefined) continue;
     if ((column.startsWith('is_') || column === 'kyc_verification') && value !== 'true' && value !== 'false') httpError(400, `Invalid ${column}`);
-    if (column === 'status' && !statuses.includes(value)) httpError(400, 'Invalid status');
+    if (column === 'status' && !statusValues.includes(value)) httpError(400, 'Invalid status');
     if (column === 'gender' && !['m', 'f'].includes(value)) httpError(400, 'Invalid gender');
     filters[column] = value;
   }

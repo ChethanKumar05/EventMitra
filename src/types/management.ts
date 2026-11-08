@@ -2,6 +2,7 @@ import { ListQuery } from './list';
 import { SecurityActor } from '../security/types';
 
 export type PersonKind = 'user' | 'owner';
+export type ManagementResource = PersonKind | 'venue';
 export type ManagementAction = 'read' | 'create' | 'edit' | 'delete';
 export type ProfileInput = Record<string, string | number | boolean | null>;
 export type AccountInput = Record<string, string | boolean | null>;

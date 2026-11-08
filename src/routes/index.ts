@@ -1,6 +1,7 @@
 import ownerRoutes from './ownerRoutes';
 import userRoutes from './userRoutes';
 import personManagementRoutes from './personManagementRoutes';
+import adminVenueRoutes from './adminVenueRoutes';
 import securityRoutes from '../security/routes';
 import { Router } from 'express';
 import { pool } from '../config/database';
@@ -15,6 +16,7 @@ router.get('/health', async (_req, res, next) => {
   } catch (error) { next(error); }
 });
 router.use('/venues', venueRoutes);
+router.use('/admin/venues', adminVenueRoutes);
 router.use('/admin', personManagementRoutes);
 router.use('/admin', securityRoutes);
 router.use('/owner',ownerRoutes);
