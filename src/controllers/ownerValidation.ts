@@ -13,6 +13,10 @@ export function ownerName(value:unknown):string {
   if(/[\u0000-\u001f\u007f]/.test(name))httpError(400,'Invalid owner_name');
   return name;
 }
+export function ownerUsername(value:unknown):string {
+  if(typeof value!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_.-]{2,99}$/.test(value))httpError(400,'user_name must contain 3-100 letters, digits, dots, underscores or hyphens, start with a letter or digit, and contain no spaces');
+  return value.toLowerCase();
+}
 function country(value:unknown):string { if(typeof value!=='string'||!/^\+[1-9][0-9]{0,2}$/.test(value))httpError(400,'country_code must be a calling code such as +91');return value; }
 function nationalPhone(value:unknown,countryCode:string):string {
   if(typeof value!=='string'||!/^[1-9][0-9]{6,14}$/.test(value)||value.length+countryCode.length-1>15)httpError(400,'phone_number must contain 7-15 digits without a country prefix; combined international number must not exceed 15 digits');
@@ -41,7 +45,7 @@ export function signupInput(value:unknown):OwnerSignupInput {
     const number=body[key];if(typeof number!=='number'||!Number.isFinite(number)||Math.abs(number)>max)httpError(400,`${key} must be a number between ${-max} and ${max}`);return number;
   };
   const pin_code=text(body.pin_code,'pin_code',12);if(!/^[A-Za-z0-9][A-Za-z0-9 -]{1,11}$/.test(pin_code))httpError(400,'Invalid pin_code');
-  const input:OwnerSignupInput={owner_name:ownerName(body.owner_name),owner_phone_number:nationalPhone(body.owner_phone_number,country_code),country_code,
+  const input:OwnerSignupInput={owner_name:ownerName(body.owner_name),user_name:ownerUsername(body.user_name),owner_phone_number:nationalPhone(body.owner_phone_number,country_code),country_code,
     email:normalizeEmail(body.email),password:body.password,gender:body.gender,doc_type:text(body.doc_type,'doc_type',50),doc_number:text(body.doc_number,'doc_number',100),doc_image:text(body.doc_image,'doc_image',2048),pin_code,
     state:text(body.state,'state',100),city:text(body.city,'city',100),area:text(body.area,'area',150),lat:coordinate('lat',90),long:coordinate('long',180),address:text(body.address,'address',2000)};
   for(const field of ['alternative_number','whatsapp_number'] as const)if(body[field]!==undefined)input[field]=body[field]===null||body[field]===''?null:validatePhone(body[field]);

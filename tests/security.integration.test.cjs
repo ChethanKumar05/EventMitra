@@ -123,6 +123,31 @@ test('PostgreSQL security API integration', { skip: !url && 'Set TEST_DATABASE_U
     assert.equal((await upgrade.query("SELECT count(*)::int AS n FROM public.venue_meals_details WHERE venue_id='legacy-venue-a'")).rows[0].n,2);
     assert.equal((await upgrade.query("INSERT INTO public.venue_details(venue_id,owner_id,venue_name) VALUES ('next-venue','old-owner','Next') RETURNING venue_code")).rows[0].venue_code,'VEN00022');
     assert.equal((await upgrade.query("INSERT INTO public.venue_decoration_details(venue_decoration_id,venue_id,venue_decoration_name) VALUES ('next-decoration','legacy-venue-a','Next') RETURNING venue_decoration_code")).rows[0].venue_decoration_code,'DEC00011');
+    await require('../dist/migrations/005_booking_migration').bookingMigration(upgrade);
+    await upgrade.query(`INSERT INTO public.booking(booking_id,user_id,venue_id,booking_from,booking_to,booking_status)
+      VALUES ('legacy-booking','old-user','legacy-venue-a','2027-02-01T08:00:00Z','2027-02-01T16:00:00Z','Accepted')`);
+    await upgrade.query(`INSERT INTO public.booking_price_details(booking_price_id,booking_id,venue_amount,total_amount)
+      VALUES ('legacy-booking-price','legacy-booking',1250,1250)`);
+    await upgrade.query(`INSERT INTO public.booking_payment_details(booking_payment_id,booking_id,payment_amount)
+      VALUES ('legacy-booking-payment','legacy-booking',250)`);
+    await upgrade.query("UPDATE public.booking SET booking_payment_id='legacy-booking-payment' WHERE booking_id='legacy-booking'");
+    await require('../dist/migrations/016_booking_flow_migration').bookingFlowMigration(upgrade);
+    await require('../dist/migrations/017_notifications_migration').notificationsMigration(upgrade);
+    const legacyBooking=(await upgrade.query("SELECT * FROM public.booking WHERE booking_id='legacy-booking'")).rows[0];
+    assert.equal(legacyBooking.owner_id,'old-owner'); assert.equal(legacyBooking.booking_code,'BKG00001');
+    assert.equal(legacyBooking.booking_status,'Accepted'); assert.equal(legacyBooking.payment_state,'legacy');
+    assert.equal(legacyBooking.booking_payment_id,'legacy-booking-payment');
+    assert.equal((await upgrade.query("SELECT total_amount FROM public.booking_price_details WHERE booking_id='legacy-booking'")).rows[0].total_amount,'1250.00');
+    assert.equal((await upgrade.query("SELECT payment_amount,order_state FROM public.booking_payment_details WHERE booking_payment_id='legacy-booking-payment'")).rows[0].payment_amount,'250.00');
+    assert.equal((await upgrade.query('SELECT count(*)::int AS n FROM public.notification_outbox')).rows[0].n,0,'Upgrading does not send historical booking notifications');
+    await require('../dist/migrations/018_owner_usernames_migration').ownerUsernamesMigration(upgrade);
+    await require('../dist/migrations/019_venue_address_migration').venueAddressMigration(upgrade);
+    await require('../dist/migrations/020_default_venue_prices_migration').defaultVenuePricesMigration(upgrade);
+    assert.equal((await upgrade.query("SELECT is_default FROM public.venue_price_details WHERE venue_price_id='legacy-price'")).rows[0].is_default,false,'Existing prices remain nondefault after upgrade');
+    assert.equal((await upgrade.query("SELECT user_name FROM public.owner WHERE owner_id='old-owner'")).rows[0].user_name,'own00020');
+    await upgrade.query("UPDATE public.owner SET owner_name='Legacy Owner' WHERE owner_id='old-owner-2'");
+    assert.equal((await upgrade.query("SELECT count(*)::int AS n FROM public.owner WHERE owner_name='Legacy Owner'")).rows[0].n,2,'Upgrade allows duplicate owner display names');
+    assert.equal((await upgrade.query("SELECT venue_address FROM public.venue_details WHERE venue_id='legacy-venue-a'")).rows[0].venue_address,null,'Legacy addresses stay null rather than inventing address data');
   } finally { await upgrade.query('ROLLBACK'); upgrade.release(); }
   await runMigrations();
   const existing = await pool.query('SELECT count(*)::int AS n FROM public.admin');
@@ -223,8 +248,8 @@ test('PostgreSQL security API integration', { skip: !url && 'Set TEST_DATABASE_U
 
   // Public venue filters must never expose inactive or pending records.
   venueOwnerId = generateId();
-  await pool.query(`INSERT INTO public.owner(owner_id,owner_code,country_code,owner_phone_number,owner_name,password)
-    VALUES ($1,$1,'+91','9000000000','Venue fixture',$2)`,[venueOwnerId,hashed]);
+  await pool.query(`INSERT INTO public.owner(owner_id,owner_code,country_code,owner_phone_number,owner_name,user_name,password)
+    VALUES ($1,$1,'+91','9000000000','Venue fixture',$1,$2)`,[venueOwnerId,hashed]);
   const venueIds=[];
   for(const [name,city,state,area,capacity,status,active] of [
     ['Garden%_ Hall','Bengaluru','Karnataka','Indiranagar',250,'Active',true],

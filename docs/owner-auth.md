@@ -9,13 +9,15 @@ New migration **011_owner_auth_migration** adds owner sessions, throttling, a no
 lookup index, and a trigger that revokes owner sessions after password changes or a move to
 an ineligible status. Migrations 001-010 are unchanged. Existing owner names/data remain intact.
 
+Migration **018_owner_usernames_migration** adds required, case-insensitive unique `user_name`, backfills existing owners from their owner codes, and removes display-name uniqueness. Existing owner names remain intact and can repeat. Unusual/conflicting legacy codes receive a generated `owner_...` username. Inspect existing usernames through the admin owner list/detail API or SQL before switching clients. No passwords are created or changed.
+
 ## Endpoints and bodies
 
 Base URL: `http://localhost:3600`. Set `Content-Type: application/json` for login.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/api/owner/auth/login` | Login with exactly one of owner_name or email, plus password |
+| POST | `/api/owner/auth/login` | Login with exactly one of user_name or email, plus password |
 | GET | `/api/owner/auth/me` | Get the owner identified by the current owner session cookie |
 | POST | `/api/owner/auth/logout` | Revoke the presented owner session and clear the owner cookie |
 
@@ -28,25 +30,18 @@ Login with email:
 }
 ```
 
-Login with owner name:
+Login with username:
 
 ```json
 {
-  "owner_name": "Ravi Kumar",
+  "user_name": "ravi_kumar",
   "password": "YOUR_PRIVATE_PASSWORD"
 }
 ```
 
-Email and owner-name matching ignore case. Leading/trailing name whitespace is trimmed;
-internal spaces are permitted and whitespace runs are normalized. Names are now unique ignoring case and repeated/outer spaces after migration 012. Names must be nonblank strings of at most
-150 characters and contain no control characters. Email uses the existing format validator.
-Password is required, must be a nonempty string and at most 256 UTF-8 bytes. Login never trims
-or changes a password. Both identity fields supplied together, neither field, arrays, malformed
-emails, invalid types, and missing passwords return 400.
+Email and username matching ignore case. Usernames are 3-100 letters, digits, dots, underscores or hyphens, beginning with a letter or digit; spaces are forbidden. Signup stores usernames in lowercase. Display names are separate and may contain spaces or repeat across owners. Login no longer accepts owner_name. Supply exactly one of email or user_name plus a nonempty password of at most 256 UTF-8 bytes.
 
-**Pending and verified owners can log in.** Rejected, blocked, hold and deleted owners cannot.
-Migration 012 rejects existing duplicate normalized names for review and prevents new duplicates. Name-based login also refuses ambiguous matches as a fallback.
-Failures use a generic 401 message and never reveal password/account document details.
+**Pending and verified owners can log in.** Rejected, blocked, hold and deleted owners cannot. Invalid credential failures use a generic 401 and never expose private profile details.
 
 The existing owner.password column must hold a hash produced by the shared
 `src/security/password.ts` hashPassword helper (`scrypt-v1`, N=131072, r=8, p=1), never plaintext.
@@ -55,7 +50,7 @@ Signup is available through /api/owner/auth/signup; no default password or accou
 
 ## Session behavior
 
-Successful login returns basic owner data and an eight-hour session cookie:
+Successful login returns basic owner data, an opaque eight-hour bearer access token and an HttpOnly cookie for the same session:
 
 ```json
 {
@@ -66,11 +61,15 @@ Successful login returns basic owner data and an eight-hour session cookie:
     "owner_id": "OWNER_ID",
     "owner_code": "OWNER_CODE",
     "owner_name": "Ravi Kumar",
+    "user_name": "ravi_kumar",
     "email": "owner@example.com",
     "status": "pending",
     "kyc_verification": false,
     "is_email_verified": false,
-    "is_phone_number_verified": false
+    "is_phone_number_verified": false,
+    "access_token": "64_HEX_CHARACTERS",
+    "token_type": "Bearer",
+    "expires_in": 28800
   }
 }
 ```
@@ -82,10 +81,10 @@ approval requirements.
 
 - Development cookie: `eventmitra_owner_session`.
 - Production cookie: `__Host-eventmitra-owner`, Secure; production requires HTTPS.
-- Cookies are HttpOnly, SameSite=Strict, path `/`. No bearer token is needed.
+- Cookies are HttpOnly, SameSite=Strict, path `/`. Cookie clients need no Authorization header. Token clients send `Authorization: Bearer <access_token>`; a supplied Authorization header takes precedence over cookies.
 - Sessions store SHA-256 token digests and a password-hash fingerprint, never the raw token.
 - Current-owner requests recheck session expiry, owner status and password fingerprint.
-- Changing a password or moving to rejected/blocked/hold/deleted revokes all owner sessions,
+- Changing a username/password, changing a primary contact, or moving to rejected/blocked/hold/deleted revokes all owner sessions,
   including when done directly through SQL. Returning to pending/verified does not restore them.
 - Approval from pending to verified preserves a valid session. Owner deletion cascades sessions.
 - Logout revokes the current owner session only and is idempotent (200 even without a valid
@@ -97,8 +96,8 @@ or an Origin that differs from the server origin. When deploying behind a TLS re
 configure trusted proxy settings for that deployment so Express sees the correct protocol.
 Authentication responses use Cache-Control: no-store.
 
-Login allows ten attempts per owner/IP per fifteen minutes, shared across name and email aliases.
-Missing/ambiguous identities have an identifier/IP budget. A separate IP budget permits up to
+Login allows ten attempts per owner/IP per fifteen minutes, shared across username and email aliases.
+Missing identities have an identifier/IP budget. A separate IP budget permits up to
 100 owner login attempts per fifteen minutes to limit identifier cycling. Successful attempts
 also count. Limits live in PostgreSQL and return 429 after exhaustion.
 
@@ -109,15 +108,15 @@ Import the separate collection and environment:
 - [Owner collection](postman/EventMitra.Owner.postman_collection.json)
 - [Owner environment](postman/EventMitra.Owner.local.postman_environment.json)
 
-Select **EventMitra - Owner Local**, set owner_password and the relevant owner_email or owner_name.
-Keep the cookie jar enabled. Run **one** folder: Login with email OR Login with owner name.
+Select **EventMitra - Owner Local**, set owner_password and the relevant owner_email or owner_user_name.
+Keep the cookie jar enabled. Run **one** folder: Login with email OR Login with username.
 Each folder logs in, fetches the current owner, logs out, and verifies logout with an expected
-401. Use only the email folder when a name is shared. Bodies show actual JSON fields; credentials
+401. Display names are not login identifiers. Bodies show actual JSON fields; credentials
 in the supplied environment are empty. Keep entered values private.
 
 ## Validation and tests
 
-400 invalid body; 401 invalid credentials, ambiguous name or missing/expired/revoked session;
+400 invalid body; 401 invalid credentials or missing/expired/revoked session;
 403 rejected origin; 429 throttled. Logout returns 200 after clearing the presented session.
 
 - `npm run typecheck`
@@ -125,7 +124,7 @@ in the supplied environment are empty. Keep entered values private.
 - `npm test` (owner integration skips unless OWNER_TEST_DATABASE_URL is set)
 - `npm run test:owner:integration:local` creates a fresh temporary database, runs the real
   PostgreSQL/HTTP owner tests, then removes it.
-- `npm run test:integration:local` runs admin/security and owner suites sequentially, each in
+- `npm run test:integration:local` runs all seven integration suites sequentially, each in
   its own fresh temporary database.
 - `npm run test:owner:integration` uses OWNER_TEST_DATABASE_URL, which must name a fresh empty
   disposable database ending in `_test`. It is distinct from TEST_DATABASE_URL so parallel test
@@ -136,3 +135,5 @@ incorrect/unsafe stored passwords, sensitive-field exclusion, admin/owner separa
 sessions, logout, expiry, password/status revocation, deletion, origins and persistent throttling.
 
 Apply migration 012 for signup, OTP and password reset support. See [required fields and complete payloads](owner-signup-otp.md). Owner verification records are target/token based and no longer contain owner_id.
+
+Successful `/api/owner/auth/verify-otp` for a normal email/phone verification challenge also creates a new eight-hour bearer/cookie session and returns `owner`, `access_token`, `token_type` and `expires_in`. Verification must match an eligible existing owner and the account state at issuance. Password-reset challenges never create sessions; reset still requires logging in afterward. Signup itself does not issue a token. See [OTP bodies](owner-signup-otp.md) and [shared file uploads](uploads-api.md).

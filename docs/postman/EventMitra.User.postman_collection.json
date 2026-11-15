@@ -2,7 +2,7 @@
   "info": {
     "name": "EventMitra - User API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "User signup, phone-only OTP login, verify, resend, current user and logout. Apply migration 013. Select User Local environment and fill country_code, user_phone_number, user_name. Optional email may stay empty. Signup creates a pending user without a session. Login/resend return a challenge; verify establishes the user session cookie. Test OTP 1111; no SMS delivery is connected and OTP endpoints are disabled in production. Signup once; for existing users skip Signup. Keep the cookie jar enabled. Unknown/ineligible phones receive the same challenge response but cannot authenticate. Bank account add/list/get and default-only update are included; apply migration 014 and fill bank_* environment fields."
+    "description": "User signup, phone-only OTP login, verify, resend, current user and logout. Apply migration 013. Select User Local environment and fill country_code, user_phone_number, user_name. Optional email may stay empty. Signup creates a pending user without a session. Login/resend return a challenge; verify establishes the user session cookie. Test OTP 1111; no SMS delivery is connected and OTP endpoints are disabled in production. Signup once; for existing users skip Signup. Keep the cookie jar enabled. Unknown/ineligible phones receive the same challenge response but cannot authenticate. Bank account add/list/get and default-only update are included; apply migration 014 and fill bank_* environment fields. Migration 018: owner signup requires unique user_name; owner_name may repeat. Login uses email or user_name. Verification purpose OTP creates a bearer session; password-reset proof does not. Migration 019 adds venue_address. Shared authenticated multipart upload: POST /api/uploads. Migration 020 adds is_default (false on insert), one fallback per venue/slot, and booking_date price resolution for user venue search/detail, quote and creation. Full endpoint changes: docs/default-venue-pricing.md."
   },
   "auth": {
     "type": "noauth"
@@ -779,6 +779,139 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Shared file uploads - run separately after login",
+      "item": [
+        {
+          "name": "Upload image or file to S3",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Actor-Type",
+                "value": "user"
+              }
+            ],
+            "url": "{{base_url}}/api/uploads",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "folder",
+                  "type": "text",
+                  "value": "general"
+                }
+              ]
+            },
+            "description": "Log in first, choose an actual file in Body > form-data, and keep the cookie jar enabled. Do not set Content-Type manually. Optional folder is a simple name. Maximum 10 MiB. AWS_REGION, AWS_S3_BUCKET and server credentials must be configured. Response url/key are stable; preview_url expires in 600 seconds. Keep the bucket private."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('File uploaded', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) { const data = pm.response.json().data; pm.environment.set('uploaded_file_key',data.key); pm.environment.set('uploaded_file_url',data.url); pm.environment.set('uploaded_file_preview_url',data.preview_url); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Booking date prices - run separately after user login",
+      "description": "Fill booking_date and venue_id. Quotes and booking creation are in the separate Booking collection.",
+      "item": [
+        {
+          "name": "Search venues with date-specific or default prices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/venues?page=1&limit=20&booking_date={{booking_date}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "venues"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "booking_date",
+                  "value": "{{booking_date}}"
+                }
+              ]
+            },
+            "description": " With booking_date, data includes effective date-specific prices or slot defaults, price_source and has_price_for_date. Choose a returned venue_price_id; defaults ignore their stored venue date range."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Date-aware venues', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get selected venue prices for date",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/venues/{{venue_id}}?booking_date={{booking_date}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "venues",
+                "{{venue_id}}"
+              ],
+              "query": [
+                {
+                  "key": "booking_date",
+                  "value": "{{booking_date}}"
+                }
+              ]
+            },
+            "description": " With booking_date, data includes effective date-specific prices or slot defaults, price_source and has_price_for_date. Choose a returned venue_price_id; defaults ignore their stored venue date range."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Date-aware venue detail', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "event": [
@@ -815,6 +948,26 @@
       "key": "user_account_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "owner_user_name",
+      "value": ""
+    },
+    {
+      "key": "managed_owner_user_name",
+      "value": ""
+    },
+    {
+      "key": "venue_address",
+      "value": ""
+    },
+    {
+      "key": "booking_date",
+      "value": ""
+    },
+    {
+      "key": "venue_id",
+      "value": ""
     }
   ]
 }

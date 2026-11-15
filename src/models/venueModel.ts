@@ -5,6 +5,7 @@ export interface VenueRow {
   venue_code: string;
   owner_id: string;
   venue_name: string;
+  venue_address: string | null;
   city: string | null;
   state: string | null;
   status: string;
@@ -13,7 +14,7 @@ export interface VenueRow {
 
 export async function listActiveVenues(limit = 20, offset = 0): Promise<VenueRow[]> {
   return query<VenueRow>(`
-    SELECT venue_id, venue_code, owner_id, venue_name, city, state, status, is_active
+    SELECT venue_id, venue_code, owner_id, venue_name, venue_address, city, state, status, is_active
     FROM public.venue_details
     WHERE status = 'Active' AND is_active = TRUE
     ORDER BY created_at DESC
@@ -23,7 +24,7 @@ export async function listActiveVenues(limit = 20, offset = 0): Promise<VenueRow
 
 export async function findActiveVenueById(venueId: string): Promise<VenueRow | null> {
   const rows = await query<VenueRow>(`
-    SELECT venue_id, venue_code, owner_id, venue_name, city, state, status, is_active
+    SELECT venue_id, venue_code, owner_id, venue_name, venue_address, city, state, status, is_active
     FROM public.venue_details
     WHERE venue_id = $1 AND status = 'Active' AND is_active = TRUE
   `, [venueId]);

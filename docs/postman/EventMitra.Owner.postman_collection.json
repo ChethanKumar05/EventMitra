@@ -2,7 +2,7 @@
   "info": {
     "name": "EventMitra - Owner API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Signup, test OTP verification, login/logout, and password recovery. Signup first creates a pending owner; names must be unique. Test OTP is 1111 and real email/SMS delivery is not connected. OTPs are disabled in production. Reset uses a verified password-reset token, not a general verification token. Run signup once; use existing-account auth folders separately afterward. Bank account add/list/get and default-only update are included; apply migration 014 and fill bank_* environment fields. Migration 015 venue/configuration APIs are included in a separate folder; set venue_name and admin venue_owner_id. Slots, decorations, meals and prices now use a single POST save endpoint with an optional record ID for updates. Null venue child record IDs create new rows; populated IDs update existing rows. Separate child PUT routes are removed. Three venue-scoped price dropdowns provide slot, decoration and meal options."
+    "description": "Signup, test OTP verification, login/logout, and password recovery. Signup first creates a pending owner; names must be unique. Test OTP is 1111 and real email/SMS delivery is not connected. OTPs are disabled in production. Reset uses a verified password-reset token, not a general verification token. Run signup once; use existing-account auth folders separately afterward. Bank account add/list/get and default-only update are included; apply migration 014 and fill bank_* environment fields. Migration 015 venue/configuration APIs are included in a separate folder; set venue_name and admin venue_owner_id. Slots, decorations, meals and prices now use a single POST save endpoint with an optional record ID for updates. Null venue child record IDs create new rows; populated IDs update existing rows. Separate child PUT routes are removed. Three venue-scoped price dropdowns provide slot, decoration and meal options. Migration 018: owner signup requires unique user_name; owner_name may repeat. Login uses email or user_name. Verification purpose OTP creates a bearer session; password-reset proof does not. Migration 019 adds venue_address. Shared authenticated multipart upload: POST /api/uploads. Migration 020 adds is_default (false on insert), one fallback per venue/slot, and booking_date price resolution for user venue search/detail, quote and creation. Full endpoint changes: docs/default-venue-pricing.md."
   },
   "auth": {
     "type": "noauth"
@@ -28,7 +28,7 @@
             "url": "{{base_url}}/api/owner/auth/signup",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"owner_name\": \"{{owner_name}}\",\n  \"owner_phone_number\": \"{{owner_phone_number}}\",\n  \"country_code\": \"{{country_code}}\",\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\",\n  \"alternative_number\": null,\n  \"profile_image\": null,\n  \"alternative_email\": null,\n  \"whatsapp_number\": null,\n  \"gender\": \"m\",\n  \"doc_type\": \"passport\",\n  \"doc_number\": \"REPLACE_WITH_DOCUMENT_NUMBER\",\n  \"doc_image\": \"/uploads/owner-document.jpg\",\n  \"pin_code\": \"560001\",\n  \"state\": \"Karnataka\",\n  \"city\": \"Bengaluru\",\n  \"area\": \"Indiranagar\",\n  \"lat\": 12.9716,\n  \"long\": 77.5946,\n  \"address\": \"REPLACE_WITH_ADDRESS\"\n}",
+              "raw": "{\n  \"user_name\": \"{{owner_user_name}}\",\n  \"owner_name\": \"{{owner_name}}\",\n  \"owner_phone_number\": \"{{owner_phone_number}}\",\n  \"country_code\": \"{{country_code}}\",\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\",\n  \"alternative_number\": null,\n  \"profile_image\": null,\n  \"alternative_email\": null,\n  \"whatsapp_number\": null,\n  \"gender\": \"m\",\n  \"doc_type\": \"passport\",\n  \"doc_number\": \"REPLACE_WITH_DOCUMENT_NUMBER\",\n  \"doc_image\": \"/uploads/owner-document.jpg\",\n  \"pin_code\": \"560001\",\n  \"state\": \"Karnataka\",\n  \"city\": \"Bengaluru\",\n  \"area\": \"Indiranagar\",\n  \"lat\": 12.9716,\n  \"long\": 77.5946,\n  \"address\": \"REPLACE_WITH_ADDRESS\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -131,6 +131,15 @@
                   "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
                 ]
               }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const data = pm.response.json().data; if (data.access_token) pm.environment.set('owner_access_token', data.access_token); }"
+                ]
+              }
             }
           ]
         }
@@ -215,6 +224,15 @@
                   "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
                 ]
               }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const data = pm.response.json().data; if (data.access_token) pm.environment.set('owner_access_token', data.access_token); }"
+                ]
+              }
             }
           ]
         }
@@ -260,6 +278,15 @@
                   "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
                   "pm.test('Envelope',function(){pm.expect(pm.response.json().status).to.eql(true);});",
                   "pm.test('Safe owner identity',function(){const owner=pm.response.json().data;pm.expect(owner.owner_id).to.be.a('string');pm.expect(['pending','verified']).to.include(owner.status);pm.expect(owner).to.not.have.property('password');pm.expect(owner).to.not.have.property('doc_json');});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const data = pm.response.json().data; if (data.access_token) pm.environment.set('owner_access_token', data.access_token); }"
                 ]
               }
             }
@@ -348,11 +375,11 @@
       ]
     },
     {
-      "name": "5 - Login with owner name",
+      "name": "5 - Login with username",
       "description": "Run this folder for this login method. The last request expects 401 after logout. Do not run the name folder for a shared owner name.",
       "item": [
         {
-          "name": "Login with owner name",
+          "name": "Login with unique username",
           "request": {
             "method": "POST",
             "header": [
@@ -368,7 +395,7 @@
             "url": "{{base_url}}/api/owner/auth/login",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"owner_name\": \"{{owner_name}}\",\n  \"password\": \"{{owner_password}}\"\n}",
+              "raw": "{\n  \"user_name\": \"{{owner_user_name}}\",\n  \"password\": \"{{owner_password}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -387,6 +414,15 @@
                   "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
                   "pm.test('Envelope',function(){pm.expect(pm.response.json().status).to.eql(true);});",
                   "pm.test('Safe owner identity',function(){const owner=pm.response.json().data;pm.expect(owner.owner_id).to.be.a('string');pm.expect(['pending','verified']).to.include(owner.status);pm.expect(owner).to.not.have.property('password');pm.expect(owner).to.not.have.property('doc_json');});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const data = pm.response.json().data; if (data.access_token) pm.environment.set('owner_access_token', data.access_token); }"
                 ]
               }
             }
@@ -553,6 +589,15 @@
                   "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
                 ]
               }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const data = pm.response.json().data; if (data.access_token) pm.environment.set('owner_access_token', data.access_token); }"
+                ]
+              }
             }
           ]
         },
@@ -629,6 +674,15 @@
                 "exec": [
                   "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
                   "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const data = pm.response.json().data; if (data.access_token) pm.environment.set('owner_access_token', data.access_token); }"
                 ]
               }
             }
@@ -735,6 +789,15 @@
                   "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
                 ]
               }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const data = pm.response.json().data; if (data.access_token) pm.environment.set('owner_access_token', data.access_token); }"
+                ]
+              }
             }
           ]
         },
@@ -813,6 +876,15 @@
                   "pm.test('Success',function(){pm.expect(pm.response.json().status).to.eql(true);});"
                 ]
               }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const data = pm.response.json().data; if (data.access_token) pm.environment.set('owner_access_token', data.access_token); }"
+                ]
+              }
             }
           ]
         },
@@ -878,6 +950,15 @@
                   "pm.test('HTTP 200',function(){pm.response.to.have.status(200);});",
                   "pm.test('Envelope',function(){pm.expect(pm.response.json().status).to.eql(true);});",
                   "pm.test('Safe owner identity',function(){const owner=pm.response.json().data;pm.expect(owner.owner_id).to.be.a('string');pm.expect(['pending','verified']).to.include(owner.status);pm.expect(owner).to.not.have.property('password');pm.expect(owner).to.not.have.property('doc_json');});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const data = pm.response.json().data; if (data.access_token) pm.environment.set('owner_access_token', data.access_token); }"
                 ]
               }
             }
@@ -1177,6 +1258,15 @@
                   "pm.test('Safe owner identity',function(){const owner=pm.response.json().data;pm.expect(owner.owner_id).to.be.a('string');pm.expect(['pending','verified']).to.include(owner.status);pm.expect(owner).to.not.have.property('password');pm.expect(owner).to.not.have.property('doc_json');});"
                 ]
               }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const data = pm.response.json().data; if (data.access_token) pm.environment.set('owner_access_token', data.access_token); }"
+                ]
+              }
             }
           ]
         },
@@ -1197,7 +1287,7 @@
             "url": "{{base_url}}/api/owner/venues",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"venue_name\": \"{{venue_name}}\",\n  \"venue_hall_capacity\": 300,\n  \"venue_dining_capacity\": 100,\n  \"venue_available_rooms_count\": 5,\n  \"venue_images\": [\n    \"/uploads/hall.jpg\"\n  ],\n  \"venue_documents\": [\n    \"/uploads/venue-proof.pdf\"\n  ],\n  \"pin_code\": \"560001\",\n  \"state\": \"Karnataka\",\n  \"city\": \"Bengaluru\",\n  \"area\": \"Central\",\n  \"lat\": 12.9716,\n  \"long\": 77.5946,\n  \"venue_number\": \"+919876543210\",\n  \"venue_alternative_number\": null,\n  \"venue_website_url\": \"https://example.com/hall\",\n  \"email\": \"hall@example.com\",\n  \"venue_parking_capacity\": 30,\n  \"venue_length\": \"100.50\",\n  \"venue_width\": \"50.00\",\n  \"venue_height\": \"15.00\",\n  \"refund_policy\": [\n    \"Refund terms\"\n  ],\n  \"cancellation_policy\": [\n    \"Cancellation terms\"\n  ],\n  \"description\": \"Sample venue description\",\n  \"is_active\": true,\n  \"is_cancellation_availble\": true,\n  \"venue_year_established\": 2020\n}",
+              "raw": "{\n  \"venue_name\": \"{{venue_name}}\",\n  \"venue_hall_capacity\": 300,\n  \"venue_dining_capacity\": 100,\n  \"venue_available_rooms_count\": 5,\n  \"venue_images\": [\n    \"/uploads/hall.jpg\"\n  ],\n  \"venue_documents\": [\n    \"/uploads/venue-proof.pdf\"\n  ],\n  \"pin_code\": \"560001\",\n  \"state\": \"Karnataka\",\n  \"city\": \"Bengaluru\",\n  \"area\": \"Central\",\n  \"lat\": 12.9716,\n  \"long\": 77.5946,\n  \"venue_number\": \"+919876543210\",\n  \"venue_alternative_number\": null,\n  \"venue_website_url\": \"https://example.com/hall\",\n  \"email\": \"hall@example.com\",\n  \"venue_parking_capacity\": 30,\n  \"venue_length\": \"100.50\",\n  \"venue_width\": \"50.00\",\n  \"venue_height\": \"15.00\",\n  \"refund_policy\": [\n    \"Refund terms\"\n  ],\n  \"cancellation_policy\": [\n    \"Cancellation terms\"\n  ],\n  \"description\": \"Sample venue description\",\n  \"is_active\": true,\n  \"is_cancellation_availble\": true,\n  \"venue_year_established\": 2020,\n  \"venue_address\": \"{{venue_address}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1399,7 +1489,8 @@
                   "description": "Optional. Enable in Params and set a value. Filters combine with AND."
                 }
               ]
-            }
+            },
+            "description": " Paginated items include venue_address, venue_meals_details, venue_price_details and venue_decoration_details; missing children are empty arrays."
           },
           "event": [
             {
@@ -1456,7 +1547,7 @@
             "url": "{{base_url}}/api/owner/venues/{{venue_id}}",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"venue_hall_capacity\": 350,\n  \"description\": \"Updated sample venue\"\n}",
+              "raw": "{\n  \"venue_hall_capacity\": 350,\n  \"description\": \"Updated sample venue\",\n  \"venue_address\": \"{{venue_address}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1971,14 +2062,14 @@
             "url": "{{base_url}}/api/owner/venues/{{venue_id}}/prices",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"venue_price_id\": null,\n  \"venue_type_slot_id\": \"{{venue_type_slot_id}}\",\n  \"venue_from_date\": \"2027-01-01\",\n  \"venue_to_date\": \"2027-12-31\",\n  \"venue_from_time\": \"08:00\",\n  \"venue_to_time\": \"16:00\",\n  \"venue_price\": \"25000.00\",\n  \"venue_advance_price\": \"2500.00\",\n  \"venue_decoration_id\": \"{{venue_decoration_id}}\",\n  \"venue_decoration_from_date\": null,\n  \"venue_decoration_to_date\": null,\n  \"venue_decoration_from_time\": null,\n  \"venue_decoration_to_time\": null,\n  \"venue_meals_id\": \"{{venue_meals_id}}\",\n  \"venue_meals_from_date\": null,\n  \"venue_meals_to_date\": null,\n  \"venue_meals_from_time\": null,\n  \"venue_meals_to_time\": null\n}",
+              "raw": "{\n  \"venue_price_id\": null,\n  \"venue_type_slot_id\": \"{{venue_type_slot_id}}\",\n  \"venue_from_date\": \"2027-01-01\",\n  \"venue_to_date\": \"2027-12-31\",\n  \"venue_from_time\": \"08:00\",\n  \"venue_to_time\": \"16:00\",\n  \"venue_price\": \"25000.00\",\n  \"venue_advance_price\": \"2500.00\",\n  \"venue_decoration_id\": \"{{venue_decoration_id}}\",\n  \"venue_decoration_from_date\": null,\n  \"venue_decoration_to_date\": null,\n  \"venue_decoration_from_time\": null,\n  \"venue_decoration_to_time\": null,\n  \"venue_meals_id\": \"{{venue_meals_id}}\",\n  \"venue_meals_from_date\": null,\n  \"venue_meals_to_date\": null,\n  \"venue_meals_from_time\": null,\n  \"venue_meals_to_time\": null,\n  \"is_default\": false\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "Single POST save: venue_price_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+            "description": "Single POST save: venue_price_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint. is_default defaults to false on insert and is preserved when omitted on update. Setting true replaces the previous default for this venue/slot."
           },
           "event": [
             {
@@ -2011,14 +2102,14 @@
             "url": "{{base_url}}/api/owner/venues/{{venue_id}}/prices",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"venue_price_id\": null,\n  \"venue_type_slot_id\": \"{{venue_evening_slot_id}}\",\n  \"venue_from_date\": \"2027-01-01\",\n  \"venue_to_date\": \"2027-12-31\",\n  \"venue_from_time\": \"18:00\",\n  \"venue_to_time\": \"06:00\",\n  \"venue_price\": \"30000.00\",\n  \"venue_advance_price\": \"2500.00\",\n  \"venue_decoration_id\": \"{{venue_decoration_id}}\",\n  \"venue_decoration_from_date\": null,\n  \"venue_decoration_to_date\": null,\n  \"venue_decoration_from_time\": null,\n  \"venue_decoration_to_time\": null,\n  \"venue_meals_id\": \"{{venue_nonveg_meals_id}}\",\n  \"venue_meals_from_date\": null,\n  \"venue_meals_to_date\": null,\n  \"venue_meals_from_time\": null,\n  \"venue_meals_to_time\": null\n}",
+              "raw": "{\n  \"venue_price_id\": null,\n  \"venue_type_slot_id\": \"{{venue_evening_slot_id}}\",\n  \"venue_from_date\": \"2027-01-01\",\n  \"venue_to_date\": \"2027-12-31\",\n  \"venue_from_time\": \"18:00\",\n  \"venue_to_time\": \"06:00\",\n  \"venue_price\": \"30000.00\",\n  \"venue_advance_price\": \"2500.00\",\n  \"venue_decoration_id\": \"{{venue_decoration_id}}\",\n  \"venue_decoration_from_date\": null,\n  \"venue_decoration_to_date\": null,\n  \"venue_decoration_from_time\": null,\n  \"venue_decoration_to_time\": null,\n  \"venue_meals_id\": \"{{venue_nonveg_meals_id}}\",\n  \"venue_meals_from_date\": null,\n  \"venue_meals_to_date\": null,\n  \"venue_meals_from_time\": null,\n  \"venue_meals_to_time\": null,\n  \"is_default\": false\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "description": "Single POST save: venue_price_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+            "description": "Single POST save: venue_price_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint. is_default defaults to false on insert and is preserved when omitted on update. Setting true replaces the previous default for this venue/slot."
           },
           "event": [
             {
@@ -2058,7 +2149,7 @@
                 }
               }
             },
-            "description": "Single POST save: venue_price_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint."
+            "description": "Single POST save: venue_price_id = null creates a record (HTTP 201); an existing ID updates it (HTTP 200). venue_id stays in the URL. Unknown existing IDs return 404. No separate child PUT endpoint. is_default defaults to false on insert and is preserved when omitted on update. Setting true replaces the previous default for this venue/slot."
           },
           "event": [
             {
@@ -2124,6 +2215,92 @@
             }
           ],
           "response": []
+        }
+      ]
+    },
+    {
+      "name": "Shared file uploads - run separately after login",
+      "item": [
+        {
+          "name": "Upload image or file to S3",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Actor-Type",
+                "value": "owner"
+              }
+            ],
+            "url": "{{base_url}}/api/uploads",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "folder",
+                  "type": "text",
+                  "value": "venues"
+                }
+              ]
+            },
+            "description": "Log in first, choose an actual file in Body > form-data, and keep the cookie jar enabled. Do not set Content-Type manually. Optional folder is a simple name. Maximum 10 MiB. AWS_REGION, AWS_S3_BUCKET and server credentials must be configured. Response url/key are stable; preview_url expires in 600 seconds. Keep the bucket private."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('File uploaded', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) { const data = pm.response.json().data; pm.environment.set('uploaded_file_key',data.key); pm.environment.set('uploaded_file_url',data.url); pm.environment.set('uploaded_file_preview_url',data.preview_url); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Default venue pricing - run separately after login",
+      "description": "Migration 020. One default per venue/slot. A new default replaces the previous one atomically. Owner changes require normal venue reapproval. Set venue_id and an existing venue_price_id.",
+      "item": [
+        {
+          "name": "Set selected price as slot default",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/owner/venues/{{venue_id}}/prices",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_price_id\": \"{{venue_price_id}}\",\n  \"is_default\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Returns 200 for update. Change is_default to false to clear. Admin replacement requires venue_management Edit, including when creating a new replacement price."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Default saved', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.is_default).to.eql(true); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     }
@@ -2202,6 +2379,22 @@
       "key": "venue_evening_price_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "owner_user_name",
+      "value": ""
+    },
+    {
+      "key": "managed_owner_user_name",
+      "value": ""
+    },
+    {
+      "key": "venue_address",
+      "value": ""
+    },
+    {
+      "key": "booking_date",
+      "value": ""
     }
   ]
 }

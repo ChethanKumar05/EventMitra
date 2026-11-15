@@ -14,5 +14,5 @@ export const venuePartIdFields = {
 } as const;
 export interface ManagedVenueQuery extends ManagementListQuery { min_capacity?: number; max_capacity?: number; }
 export const venueStatuses = ['Active', 'Rejected', 'Blocked', 'Deleted', 'Pending', 'Hold'] as const;
-export const managedVenueColumns = ['venue_id', 'venue_code', 'owner_id', 'venue_name', 'venue_hall_capacity', 'venue_dining_capacity', 'venue_available_rooms_count', 'venue_parking_capacity', 'pin_code', 'state', 'city', 'area', 'venue_number', 'email', 'status', 'is_active', 'is_cancellation_availble', 'venue_year_established', 'created_at', 'updated_at'] as const;
-export const ownerDropdownColumns = ['owner_id', 'owner_code', 'owner_name', 'status'] as const;
+export const managedVenueColumns = ['venue_id', 'venue_code', 'owner_id', 'venue_name', 'venue_address', 'venue_hall_capacity', 'venue_dining_capacity', 'venue_available_rooms_count', 'venue_parking_capacity', 'pin_code', 'state', 'city', 'area', 'venue_number', 'email', 'status', 'is_active', 'is_cancellation_availble', 'venue_year_established', 'created_at', 'updated_at'] as const;
+export const ownerDropdownColumns = ['owner_id', 'owner_code', 'owner_name', 'user_name', 'status'] as const;

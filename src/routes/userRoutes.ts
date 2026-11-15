@@ -1,16 +1,23 @@
 import { Router } from 'express';
 import * as auth from '../controllers/userAuthController';
 import { bankAccountController } from '../controllers/bankAccountController';
+import * as venues from '../controllers/venueDiscoveryController';
+import { userBookingRoutes } from './bookingRoutes';
+import { notificationRoutes } from './notificationRoutes';
 import { authenticateUser, userAuthHeaders } from '../middleware/userAuth';
 
 const router = Router();
 router.use(userAuthHeaders);
+router.use('/bookings',userBookingRoutes);
+router.use('/notifications',notificationRoutes('user'));
 router.post('/auth/signup', auth.signup);
 router.post('/auth/login', auth.login);
 router.post('/auth/verify-otp', auth.verifyOtp);
 router.post('/auth/resend-otp', auth.resendOtp);
 router.get('/auth/me', authenticateUser, auth.me);
 router.post('/auth/logout', auth.logout);
+router.get('/venues', authenticateUser, venues.list);
+router.get('/venues/:venueId', authenticateUser, venues.get);
 const accounts = bankAccountController('user');
 router.get('/accounts', authenticateUser, accounts.list);
 router.get('/accounts/:accountId', authenticateUser, accounts.get);

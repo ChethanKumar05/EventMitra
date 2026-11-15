@@ -2,6 +2,11 @@ import { ownerSignupOtpMigration } from './012_owner_signup_otp_migration';
 import { userAuthMigration } from './013_user_auth_migration';
 import { peopleAccountsMigration } from './014_people_accounts_migration';
 import { venueManagementMigration } from './015_venue_management_migration';
+import { bookingFlowMigration } from './016_booking_flow_migration';
+import { notificationsMigration } from './017_notifications_migration';
+import { ownerUsernamesMigration } from './018_owner_usernames_migration';
+import { venueAddressMigration } from './019_venue_address_migration';
+import { defaultVenuePricesMigration } from './020_default_venue_prices_migration';
 import { ownerAuthMigration } from './011_owner_auth_migration';
 import { adminIdentityValidationMigration } from './010_admin_identity_validation_migration';
 import { adminModulePermissionsMigration } from './009_admin_module_permissions_migration';
@@ -32,6 +37,11 @@ const migrations: Array<{ name: string; run: (client: PoolClient) => Promise<voi
   { name: '013_user_auth_migration', run: userAuthMigration },
   { name: '014_people_accounts_migration', run: peopleAccountsMigration },
   { name: '015_venue_management_migration', run: venueManagementMigration },
+  { name: '016_booking_flow_migration', run: bookingFlowMigration },
+  { name: '017_notifications_migration', run: notificationsMigration },
+  { name: '018_owner_usernames_migration', run: ownerUsernamesMigration },
+  { name: '019_venue_address_migration', run: venueAddressMigration },
+  { name: '020_default_venue_prices_migration', run: defaultVenuePricesMigration },
 ];
 
 export async function runMigrations() {

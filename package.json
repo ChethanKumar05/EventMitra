@@ -22,14 +22,23 @@
     "test:people:integration": "npm run build && node --test tests/people-accounts.integration.test.cjs",
     "test:people:integration:local": "npm run build && node tests/run-local-integration.cjs people",
     "test:venue:integration": "npm run build && node --test tests/venue-management.integration.test.cjs",
-    "test:venue:integration:local": "npm run build && node tests/run-local-integration.cjs venue"
+    "test:venue:integration:local": "npm run build && node tests/run-local-integration.cjs venue",
+    "booking:worker": "tsx src/workers/bookingWorker.ts",
+    "test:booking:integration": "npm run build && node --test tests/booking.integration.test.cjs",
+    "test:booking:integration:local": "npm run build && node tests/run-local-integration.cjs booking",
+    "test:upload:integration:local": "npm run build && node tests/run-local-integration.cjs upload"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1169.0",
+    "@aws-sdk/s3-request-presigner": "^3.1169.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
+    "google-auth-library": "^10.9.1",
     "helmet": "^8.1.0",
+    "multer": "^2.5.0",
+    "nodemailer": "^10.4.0",
     "pg": "^8.16.3",
     "socket.io": "^4.8.1",
     "ulid": "^3.0.1"
@@ -38,7 +47,9 @@
     "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.23",
+    "@types/multer": "^2.3.0",
     "@types/node": "^22.18.6",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.15.5",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"

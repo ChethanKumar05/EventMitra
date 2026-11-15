@@ -1,0 +1,25 @@
+import { Router } from 'express';
+import { bookingController } from '../controllers/bookingController';
+import { authenticateUser } from '../middleware/userAuth';
+import { authenticateOwner } from '../middleware/ownerAuth';
+import { authenticateAdmin,securityHeaders } from '../middleware/adminAuth';
+import { requireManagementPermission } from '../middleware/managementAuth';
+
+export const userBookingRoutes=Router(),ownerBookingRoutes=Router(),adminBookingRoutes=Router();
+const users=bookingController('user'),owners=bookingController('owner'),admins=bookingController('admin');
+userBookingRoutes.use(authenticateUser);
+userBookingRoutes.post('/quote',users.quote);
+userBookingRoutes.post('/',users.create);
+userBookingRoutes.get('/',users.list);
+userBookingRoutes.get('/:bookingId',users.get);
+userBookingRoutes.post('/:bookingId/payment-order',users.paymentOrder);
+userBookingRoutes.post('/:bookingId/verify-payment',users.verifyPayment);
+ownerBookingRoutes.use(authenticateOwner);
+ownerBookingRoutes.get('/',owners.list);
+ownerBookingRoutes.get('/:bookingId',owners.get);
+ownerBookingRoutes.post('/:bookingId/decision',owners.decision);
+adminBookingRoutes.use(securityHeaders,authenticateAdmin);
+adminBookingRoutes.get('/refund-reviews',requireManagementPermission('booking','read'),admins.refundReviews);
+adminBookingRoutes.get('/',requireManagementPermission('booking','read'),admins.list);
+adminBookingRoutes.get('/:bookingId',requireManagementPermission('booking','read'),admins.get);
+adminBookingRoutes.post('/:bookingId/refund-reviews/:reviewId/decision',requireManagementPermission('booking','edit'),admins.refundDecision);

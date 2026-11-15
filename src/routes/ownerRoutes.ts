@@ -1,11 +1,15 @@
 import * as signup from '../controllers/ownerSignupController';
 import { bankAccountController } from '../controllers/bankAccountController';
 import ownerVenueRoutes from './ownerVenueRoutes';
+import { ownerBookingRoutes } from './bookingRoutes';
+import { notificationRoutes } from './notificationRoutes';
 import { Router } from 'express';
 import * as auth from '../controllers/ownerAuthController';
 import { authenticateOwner,ownerAuthHeaders } from '../middleware/ownerAuth';
 const router=Router();
 router.use(ownerAuthHeaders);
+router.use('/bookings',ownerBookingRoutes);
+router.use('/notifications',notificationRoutes('owner'));
 router.use('/venues',ownerVenueRoutes);
 router.post('/auth/signup',signup.signup);
 router.post('/auth/send-otp',signup.sendOtp);

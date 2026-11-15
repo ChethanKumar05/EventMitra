@@ -339,3 +339,11 @@ Reimport updated [Owner](postman/EventMitra.Owner.postman_collection.json) and [
 Migration 015 stops before changes if existing venues have more than two meals or prices link to another venue's decoration/meal. Review those records before retrying; no records are silently removed or reassigned.
 
 Run `npm run typecheck`, `npm run build`, `npm test`, `npm run test:venue:integration:local`. Local tests create/drop an isolated temporary database without migrating the application database. Alternatively set `VENUE_TEST_DATABASE_URL` to a fresh expendable database ending in `_test` and run `npm run test:venue:integration`. `npm run test:integration:local` runs all five suites, including legacy migration upgrade fixtures.
+
+## Venue address and list configuration arrays (migration 019)
+
+Owner and admin venue create/partial update accept `venue_address` as text (up to 10,000 characters) or null. Missing addresses on legacy rows remain null. All venue list/detail routes, including user discovery and existing public venue reads, return venue_address. Example: `{"venue_address":"12 Main Road, Indiranagar, Bengaluru 560038"}`.
+
+`GET /api/owner/venues?page=1&limit=20` and the corresponding admin venue list now embed `venue_meals_details`, `venue_price_details` and `venue_decoration_details` as arrays on every item, with the same row IDs/fields/order as full venue detail. Missing rows return `[]`. Pagination counts venues rather than child rows, and filtering/owner scope is preserved. The other relations remain available through the existing full-detail endpoint.
+
+Migration **020** adds `is_default` (false on insertion) to price-save bodies and every embedded price row. Set an existing `venue_price_id` plus `is_default: true` through the same owner/admin POST `/venues/:venueId/prices` API. At most one default is kept per venue/slot, with atomic replacement. See [date precedence, fallback examples and every affected API](default-venue-pricing.md).

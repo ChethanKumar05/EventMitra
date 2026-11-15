@@ -66,7 +66,17 @@ export async function listManagedVenues(actor: VenueActor, query: ManagedVenueQu
   if (query.min_capacity !== undefined) filters.add(`r.venue_hall_capacity>=${filters.bind(query.min_capacity)}`);
   if (query.max_capacity !== undefined) filters.add(`r.venue_hall_capacity<=${filters.bind(query.max_capacity)}`);
   const columns = managedVenueColumns.map(column => `r."${column}"`).join(',') + (actor.type === 'admin' ? ',(SELECT owner_name FROM public.owner o WHERE o.owner_id=r.owner_id) AS owner_name,(SELECT owner_code FROM public.owner o WHERE o.owner_id=r.owner_id) AS owner_code' : '');
-  return paginatedQuery('venue_details', columns, listOrder(query, managedVenueColumns, 'created_at DESC,venue_id DESC', 'venue_id'), filters, query);
+  const relations = ['venue_meals_details','venue_price_details','venue_decoration_details'].map(table =>
+    `coalesce((SELECT jsonb_agg(to_jsonb(c) ORDER BY c.${table === 'venue_meals_details' ? 'venue_meals_id' : table === 'venue_price_details' ? 'venue_price_id' : 'venue_decoration_id'}) FROM public.${table} c WHERE c.venue_id=page_items.venue_id),'[]'::jsonb) AS ${table}`);
+  const values = [...filters.values,query.limit,(query.page-1)*query.limit];
+  const order = listOrder(query,managedVenueColumns,'created_at DESC,venue_id DESC','venue_id');
+  // Page venues before aggregating child rows, so joins cannot inflate totals or repeat venues.
+  const result = (await pool.query(`WITH matching AS (SELECT ${columns} FROM public.venue_details r ${filters.where}),
+    page_items AS (SELECT * FROM matching ORDER BY ${order} LIMIT $${values.length-1} OFFSET $${values.length}),
+    expanded AS (SELECT page_items.*,${relations.join(',')} FROM page_items)
+    SELECT (SELECT count(*)::int FROM matching) AS total,coalesce((SELECT json_agg(expanded ORDER BY ${order}) FROM expanded),'[]'::json) AS items`,values)).rows[0];
+  const totalPages = Math.ceil(result.total/query.limit);
+  return {...result,page:query.page,limit:query.limit,totalPages,hasNextPage:query.page<totalPages,hasPreviousPage:query.page>1};
 }
 
 export async function venueOwnerDropdown(query: ManagementListQuery) {
@@ -190,6 +200,13 @@ export async function writeVenuePart(actor: VenueActor, venueId: string, part: V
     if (part === 'meals' && !existing && (await client.query('SELECT count(*)::int AS n FROM public.venue_meals_details WHERE venue_id=$1', [venueId])).rows[0].n >= 2) httpError(409, 'A maximum of two meal records per venue is allowed');
     const values = { ...input };
     await validatePart(client, part, venueId, values, existing);
+    if(part==='prices'&&(values.is_default??existing?.is_default??false)){
+      const slotId=values.venue_type_slot_id??existing?.venue_type_slot_id;
+      const other=await client.query(`SELECT 1 FROM public.venue_price_details WHERE venue_id=$1 AND venue_type_slot_id=$2 AND is_default AND venue_price_id IS DISTINCT FROM $3`,[venueId,slotId,partId??null]);
+      // Replacing a previous default changes an existing price as well as the selected row.
+      if(other.rowCount&&actor.type==='admin')await assertManagementActor(actor.actor,'venue','edit',client);
+      await client.query(`UPDATE public.venue_price_details SET is_default=false,updated_at=now() WHERE venue_id=$1 AND venue_type_slot_id=$2 AND is_default AND venue_price_id IS DISTINCT FROM $3`,[venueId,slotId,partId??null]);
+    }
     const keys = Object.keys(values), params = Object.values(values);
     let saved;
     if (existing) {

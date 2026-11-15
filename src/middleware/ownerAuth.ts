@@ -4,6 +4,10 @@ import { httpError } from '../utils/httpError';
 export const ownerCookieName=process.env.NODE_ENV==='production'?'__Host-eventmitra-owner':'eventmitra_owner_session';
 export const ownerCookieOptions={httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'strict' as const,path:'/'};
 export function ownerSessionToken(req:Request):string {
+  if(req.headers.authorization!==undefined){
+    const match=/^Bearer ([a-f0-9]{64})$/i.exec(req.headers.authorization);
+    return match?.[1]??'';
+  }
   const cookie=(req.headers.cookie??'').split(';').map(value=>value.trim()).find(value=>value.startsWith(`${ownerCookieName}=`));
   const token=cookie?.slice(ownerCookieName.length+1)??'';
   return /^[a-f0-9]{64}$/.test(token)?token:'';

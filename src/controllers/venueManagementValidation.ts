@@ -7,12 +7,12 @@ import { recordId, text } from './securityValidation';
 
 const integers = ['venue_hall_capacity', 'venue_dining_capacity', 'venue_available_rooms_count', 'venue_parking_capacity', 'venue_year_established'];
 const venueArrays = ['venue_images', 'venue_documents', 'refund_policy', 'cancellation_policy'];
-const venueText = ['venue_name', 'pin_code', 'state', 'city', 'area', 'venue_number', 'venue_alternative_number', 'venue_website_url', 'email', 'description'];
+const venueText = ['venue_name', 'venue_address', 'pin_code', 'state', 'city', 'area', 'venue_number', 'venue_alternative_number', 'venue_website_url', 'email', 'description'];
 const amenities = ['is_chairs_available', 'is_ac_available', 'is_fan_available', 'is_guest_room_available', 'is_parking_available', 'is_washroom_available'];
 const partFields: Record<VenuePart, string[]> = {
   'type-slots': ['slot_name', 'from_time', 'to_time', 'description', 'is_active'],
   amenities,
-  prices: ['venue_type_slot_id', 'venue_from_date', 'venue_to_date', 'venue_from_time', 'venue_to_time', 'venue_price', 'venue_advance_price',
+  prices: ['is_default', 'venue_type_slot_id', 'venue_from_date', 'venue_to_date', 'venue_from_time', 'venue_to_time', 'venue_price', 'venue_advance_price',
     'venue_decoration_id', 'venue_decoration_from_date', 'venue_decoration_to_date', 'venue_decoration_from_time', 'venue_decoration_to_time',
     'venue_meals_id', 'venue_meals_from_date', 'venue_meals_to_date', 'venue_meals_from_time', 'venue_meals_to_time'],
   decorations: ['venue_decoration_name', 'venue_decoration_images', 'venue_decoration_price', 'venue_decoration_advance_price', 'advance_return_within_date', 'is_cancellation_availble', 'cancelation_policy', 'return_policy'],
@@ -79,7 +79,7 @@ export function managedVenueInput(value: unknown, admin: boolean, create = false
       catch { httpError(400, 'Invalid venue_website_url'); }
       input[key] = website;
     } else {
-      const max = key === 'description' ? 10000 : key === 'reason' ? 2000 : key === 'area' ? 150 : key === 'pin_code' ? 12 : 100;
+      const max = ['description', 'venue_address'].includes(key) ? 10000 : key === 'reason' ? 2000 : key === 'area' ? 150 : key === 'pin_code' ? 12 : 100;
       input[key] = text(val, key, max);
       if (key === 'pin_code' && !/^[A-Za-z0-9][A-Za-z0-9 -]{1,11}$/.test(input[key] as string)) httpError(400, 'Invalid pin_code');
     }

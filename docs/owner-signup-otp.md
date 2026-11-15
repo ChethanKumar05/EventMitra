@@ -1,11 +1,6 @@
 # Owner signup, OTP verification and password recovery
 
-Run `npm run migrate` through **012_owner_signup_otp_migration**. Earlier migrations, including
-003, remain unchanged. Migration 012 removes owner_id from owner_phone_verification and adds
-target-bound email/phone challenges with otp_token hashes. Historical OTP rows are retained
-as expired/consumed records. Owner names become unique ignoring case and repeated/outer spaces;
-existing duplicates cause migration to stop and list them for correction rather than merging data.
-New owners receive generated codes such as OWN00001.
+Run `npm run migrate` through migration **018_owner_usernames_migration**. Earlier migration files remain unchanged. Migration 012 introduced target-bound verification records without owner_id; migration 018 makes user_name unique, allows duplicate owner_name values, and invalidates older unbound contact-verification challenges. New owners receive generated codes such as OWN00001. Existing owners retain their names and receive usernames derived from owner codes.
 
 ## 1. Signup: POST /api/owner/auth/signup
 
@@ -15,6 +10,7 @@ not approve KYC, change status to verified, or start a login session.
 ```json
 {
   "owner_name": "Ravi Kumar",
+  "user_name": "ravi_kumar",
   "owner_phone_number": "9876543210",
   "country_code": "+91",
   "alternative_number": null,
@@ -39,7 +35,8 @@ not approve KYC, change status to verified, or start a login session.
 
 | Required | Validation |
 | --- | --- |
-| owner_name | Nonblank, max 150; unique ignoring case/repeated/outer spaces |
+| owner_name | Nonblank display name, max 150; duplicates allowed |
+| user_name | Required unique login name, 3-100 letters/digits/dots/underscores/hyphens; starts with a letter/digit; no spaces; case-insensitive |
 | owner_phone_number | String of 7-15 national digits; no country prefix |
 | country_code | Calling code such as +91: + followed by 1-3 digits; international total max 15 digits |
 | email | Valid primary email, max 255; unique ignoring case |
@@ -56,7 +53,7 @@ Optional: alternative_number and whatsapp_number (7-15 digits, optional leading 
 profile_image (asset reference/URL, max 2048), alternative_email (valid email). Optional fields
 may be omitted, null or empty. Phone uniqueness uses country_code + national phone number.
 Owner IDs/codes/status/KYC/verification flags cannot be supplied. Invalid fields return 400;
-duplicate name/email/phone returns 409. Signup returns 201 with basic owner identity and flags,
+duplicate username/email/phone returns 409. Signup returns 201 with basic owner identity and flags,
 never password/document/bank data. Signup is limited to 20 attempts/IP per fifteen minutes.
 
 ## 2. Send OTP: POST /api/owner/auth/send-otp
@@ -108,6 +105,22 @@ is consumed once it succeeds. Email verification updates is_email_verified; phon
 updates is_phone_number_verified for the matching primary country/phone. It does not change
 KYC or approval status. Login and auth/me return both verification flags.
 
+For purpose=verification, success also creates an eight-hour owner session, sets the owner cookie, and returns:
+
+```json
+{
+  "is_verified": true,
+  "type": "email",
+  "purpose": "verification",
+  "owner": {"owner_id":"OWNER_ID","owner_name":"Ravi Kumar","user_name":"ravi_kumar"},
+  "access_token": "64_HEX_CHARACTERS",
+  "token_type": "Bearer",
+  "expires_in": 28800
+}
+```
+
+The owner object also contains its normal public identity/verification flags. Authenticate subsequent owner calls with the cookie or `Authorization: Bearer <access_token>`. Challenges bind to an eligible existing owner at issuance; unknown/blocked owners and stale account proofs cannot receive a session. A verification OTP issued before an account existed cannot log in an account created later. Password-reset verification remains separate and returns no authentication token or cookie.
+
 ## 4. Forgot password: POST /api/owner/auth/forgot-password
 
 Use the same email/phone body as send-otp. This issues a separate purpose=password_reset token:
@@ -144,7 +157,7 @@ are rejected. Password reset requests are limited to twenty/IP per fifteen minut
 ## Postman and testing
 
 Reimport [the Owner collection](postman/EventMitra.Owner.postman_collection.json) and
-[Owner environment](postman/EventMitra.Owner.local.postman_environment.json). Fill owner_name,
+[Owner environment](postman/EventMitra.Owner.local.postman_environment.json). Fill owner_name, owner_user_name,
 owner_email, owner_phone_number, country_code, owner_password and owner_new_password privately.
 Signup runs once per account. Follow email/phone verification folders, then login folders.
 The recovery folders capture reset tokens, verify, reset, log in with the new password and log

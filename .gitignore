@@ -9,3 +9,5 @@ coverage/
 
 # Generated pgAdmin bootstrap contains a private password hash.
 .local/admin-bootstrap.sql
+.local/*service-account*.json
+.local/*.credentials.json

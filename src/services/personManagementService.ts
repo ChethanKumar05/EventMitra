@@ -10,7 +10,7 @@ import { securityTransaction } from './securityService';
 
 export const personDefinitions = {
   user: { table: '"user"', id: 'user_id', detail: 'user_id,user_code,user_name,country_code,user_phone_number,email,gender,profile_image,whatsapp_number,alternative_number,status,is_active,is_phone_number_verified,reason,created_at,updated_at' },
-  owner: { table: 'owner', id: 'owner_id', detail: 'owner_id,owner_code,owner_name,country_code,owner_phone_number,email,gender,profile_image,whatsapp_number,alternative_number,alternative_email,kyc_verification,is_phone_number_verified,is_email_verified,doc_type,doc_number,doc_image,pin_code,state,city,area,lat,"long",address,reason,status,created_at,updated_at' },
+  owner: { table: 'owner', id: 'owner_id', detail: 'owner_id,owner_code,owner_name,user_name,country_code,owner_phone_number,email,gender,profile_image,whatsapp_number,alternative_number,alternative_email,kyc_verification,is_phone_number_verified,is_email_verified,doc_type,doc_number,doc_image,pin_code,state,city,area,lat,"long",address,reason,status,created_at,updated_at' },
 } as const;
 
 export function managementFilters(query: ManagementListQuery, columns: readonly string[]): ListFilters {

@@ -54,6 +54,7 @@ Owner create example (replace the password and document values with your private
   "country_code": "+91",
   "owner_phone_number": "9876543211",
   "owner_name": "Anita Kumar",
+  "user_name": "anita_kumar",
   "email": "anita@example.com",
   "password": "REPLACE_WITH_A_PRIVATE_PASSWORD",
   "gender": "f",
@@ -77,7 +78,7 @@ Owner create example (replace the password and document values with your private
 }
 ```
 
-PUT is partial: send only fields to change. Supported fields are the signup fields plus the administrative fields above. Codes, IDs and verification flags are read-only. Unknown fields and empty updates are rejected. Valid statuses for both resources: `pending`, `verified`, `rejected`, `blocked`, `hold`, `deleted`. Duplicate phone/email or normalized owner name returns `409`. User names need not be unique.
+PUT is partial: send only fields to change. Supported fields are the signup fields plus the administrative fields above. Codes, IDs and verification flags are read-only. Unknown fields and empty updates are rejected. Valid statuses for both resources: `pending`, `verified`, `rejected`, `blocked`, `hold`, `deleted`. Duplicate phone/email or owner `user_name` returns `409`. Owner usernames are case-insensitive and cannot contain spaces; display `owner_name` can repeat. User-profile display names remain nonunique.
 
 Example user update:
 
@@ -170,7 +171,7 @@ Every list supports `page` (default 1), `limit` (default 20, max 100), `search`,
 The following columns support search, exact filters and sorting:
 
 - User profiles: `user_id`, `user_code`, `user_name`, `country_code`, `user_phone_number`, `email`, `gender`, `status`, `is_active`, `is_phone_number_verified`, `created_at`, `updated_at`.
-- Owner profiles: `owner_id`, `owner_code`, `owner_name`, `country_code`, `owner_phone_number`, `email`, `gender`, `status`, `kyc_verification`, `is_phone_number_verified`, `is_email_verified`, `city`, `state`, `area`, `created_at`, `updated_at`.
+- Owner profiles: `owner_id`, `owner_code`, `owner_name`, `user_name`, `country_code`, `owner_phone_number`, `email`, `gender`, `status`, `kyc_verification`, `is_phone_number_verified`, `is_email_verified`, `city`, `state`, `area`, `created_at`, `updated_at`.
 - Accounts: resource account ID, `account_number`, `account_holder_name`, `ifsc_code`, `branch_name`, `branch_address`, `is_default`, `created_at`, `updated_at`.
 
 Boolean filters use `true`/`false`. Response `data` contains `items`, `total`, `page`, `limit`, `totalPages`, `hasNextPage`, `hasPreviousPage`. Totals and page use the same filters/snapshot. Out-of-range pages return empty items with the filtered total.
@@ -187,3 +188,5 @@ GET /api/admin/owners/OWNER_ID/accounts?search_column=branch_name&search=central
 Reimport the updated [Admin](postman/EventMitra.postman_collection.json), [User](postman/EventMitra.User.postman_collection.json) and [Owner](postman/EventMitra.Owner.postman_collection.json) collections and environments. New folders have visible JSON bodies and capture profile/account IDs. Supply your own bank values. Account folders log in first; repeating adds counts toward the limit. Admin deletion samples mark only the sample managed profiles deleted.
 
 Run `npm run typecheck`, `npm run build`, `npm test`, and `npm run test:people:integration:local`. The people suite creates/drops an isolated PostgreSQL database and tests permissions, ownership, field validation, pagination/search/sort/filter, duplicate rollback, concurrent default/limit enforcement, contact changes and soft deletion. Alternatively set `PEOPLE_TEST_DATABASE_URL` to a fresh expendable database ending in `_test` and run `npm run test:people:integration`. `npm run test:integration:local` runs all four admin, owner, user and people suites in separate databases.
+
+Apply migration 018 for owner usernames. Admin owner creation requires user_name; partial owner updates can change it and revoke existing owner sessions.

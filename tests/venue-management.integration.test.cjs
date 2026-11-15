@@ -20,7 +20,7 @@ test('Owner-scoped venue configuration and admin venue management', {
   const password = 'Venue-test-' + randomBytes(16).toString('hex'), hash = await hashPassword(password);
   const ownerA = generateId(), ownerB = generateId(), blockedOwner = generateId();
   for (const [id, phone, name, status] of [[ownerA, '9876400001', 'First Venue Owner', 'pending'], [ownerB, '9876400002', 'Second Venue Owner', 'verified'], [blockedOwner, '9876400003', 'Blocked Venue Owner', 'blocked']]) {
-    await pool.query('INSERT INTO public.owner(owner_id,country_code,owner_phone_number,owner_name,email,password,status) VALUES($1,$2,$3,$4,$5,$6,$7)', [id, '+91', phone, name, phone + '@example.test', hash, status]);
+    await pool.query('INSERT INTO public.owner(owner_id,country_code,owner_phone_number,owner_name,user_name,email,password,status) VALUES($1,$2,$3,$4,$3,$5,$6,$7)', [id, '+91', phone, name, phone + '@example.test', hash, status]);
   }
   await require('../dist/services/adminAuthService').bootstrapSuperAdmin({ name: 'Venue test admin', email: 'venue-admin@example.test', password });
   const { app } = require('../dist/app'); server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
@@ -36,7 +36,7 @@ test('Owner-scoped venue configuration and admin venue management', {
   const own = (path = '', method = 'GET', body, cookie = cookieA) => request('/api/owner/venues' + path, method, body, cookie);
   const manage = (path = '', method = 'GET', body, cookie = admin) => request('/api/admin/venues' + path, method, body, cookie);
   const adminApi = (path, method = 'GET', body) => request('/api/admin/' + path, method, body, admin);
-  const sample = { venue_name: 'Garden %_ Hall', venue_hall_capacity: 250, venue_dining_capacity: 100, venue_available_rooms_count: 4, venue_images: ['/uploads/hall.jpg'], venue_documents: ['/uploads/private-proof.pdf'], pin_code: '560001', state: 'Karnataka', city: 'Bengaluru', area: 'Central', lat: 0, long: 0, venue_number: '+919876400001', venue_alternative_number: null, venue_website_url: 'https://example.test/hall', email: 'HALL@EXAMPLE.TEST', venue_parking_capacity: 20, venue_length: '100.50', venue_width: 50, venue_height: 10, refund_policy: ['Refund terms'], cancellation_policy: ['Cancellation terms'], description: 'Sample venue', is_active: true, is_cancellation_availble: true, venue_year_established: 2020 };
+  const sample = { venue_name: 'Garden %_ Hall', venue_address:'12 Main Road, Central, Bengaluru 560001', venue_hall_capacity: 250, venue_dining_capacity: 100, venue_available_rooms_count: 4, venue_images: ['/uploads/hall.jpg'], venue_documents: ['/uploads/private-proof.pdf'], pin_code: '560001', state: 'Karnataka', city: 'Bengaluru', area: 'Central', lat: 0, long: 0, venue_number: '+919876400001', venue_alternative_number: null, venue_website_url: 'https://example.test/hall', email: 'HALL@EXAMPLE.TEST', venue_parking_capacity: 20, venue_length: '100.50', venue_width: 50, venue_height: 10, refund_policy: ['Refund terms'], cancellation_policy: ['Cancellation terms'], description: 'Sample venue', is_active: true, is_cancellation_availble: true, venue_year_established: 2020 };
   let venueA, venueB, slotA, slotB, decorationA, decorationB, mealA, mealB, priceA;
   const dropdownParts = ['type-slots', 'decorations', 'meals'];
 
@@ -45,13 +45,13 @@ test('Owner-scoped venue configuration and admin venue management', {
     assert.equal((await request('/api/admin/venues')).status, 401);
     assert.equal((await own('', 'POST', sample, admin)).status, 401);
     assert.equal((await manage('', 'POST', { ...sample, owner_id: ownerA }, cookieA)).status, 401);
-    for (const body of [null, [], {}, { ...sample, venue_name: '' }, { ...sample, venue_code: 'VEN00001' }, { ...sample, owner_id: ownerB }, { ...sample, status: 'Active' }, { ...sample, reason: 'Forged approval' }, { ...sample, venue_hall_capacity: -1 }, { ...sample, venue_hall_capacity: '5' }, { ...sample, venue_images: 'not-array' }, { ...sample, lat: 91 }, { ...sample, long: '0' }, { ...sample, email: 'bad' }, { ...sample, venue_number: 123 }, { ...sample, venue_website_url: 'javascript:alert(1)' }, { ...sample, venue_width: '1.005' }, { ...sample, venue_year_established: 1799 }, { ...sample, is_active: 'true' }]) assert.equal((await own('', 'POST', body)).status, 400, JSON.stringify(body));
+    for (const body of [null, [], {}, { ...sample, venue_name: '' }, { ...sample, venue_address: 123 }, { ...sample, venue_address: 'x'.repeat(10001) }, { ...sample, venue_code: 'VEN00001' }, { ...sample, owner_id: ownerB }, { ...sample, status: 'Active' }, { ...sample, reason: 'Forged approval' }, { ...sample, venue_hall_capacity: -1 }, { ...sample, venue_hall_capacity: '5' }, { ...sample, venue_images: 'not-array' }, { ...sample, lat: 91 }, { ...sample, long: '0' }, { ...sample, email: 'bad' }, { ...sample, venue_number: 123 }, { ...sample, venue_website_url: 'javascript:alert(1)' }, { ...sample, venue_width: '1.005' }, { ...sample, venue_year_established: 1799 }, { ...sample, is_active: 'true' }]) assert.equal((await own('', 'POST', body)).status, 400, JSON.stringify(body));
     const created = await own('', 'POST', sample); assert.equal(created.status, 201, created.message);
     venueA = created.data.venue_id; assert.equal(created.data.venue_code, 'VEN00001'); assert.equal(created.data.owner_id, ownerA); assert.equal(created.data.status, 'Pending'); assert.equal(created.data.email, 'hall@example.test'); assert.equal(created.headers.get('cache-control'), 'no-store');
     const other = await own('', 'POST', { venue_name: 'Other Owner Venue', city: 'Chennai' }, cookieB); assert.equal(other.status, 201); venueB = other.data.venue_id;
     const detail = await own('/' + venueA); assert.equal(detail.status, 200);
     for (const key of ['venue_type_slots', 'venue_price_details', 'venue_decoration_details', 'venue_meals_details']) assert.deepEqual(detail.data[key], []);
-    assert.equal(detail.data.venue_aminites, null); assert.deepEqual(detail.data.venue_documents, sample.venue_documents);
+    assert.equal(detail.data.venue_address,sample.venue_address);assert.equal((await own()).data.items[0].venue_address,sample.venue_address);assert.equal(detail.data.venue_aminites, null); assert.deepEqual(detail.data.venue_documents, sample.venue_documents);
     for (const part of dropdownParts) {
       const empty = await own(`/${venueA}/${part}/dropdown`); assert.equal(empty.status, 200); assert.deepEqual(empty.data, []);
       assert.equal((await request(`/api/owner/venues/${venueA}/${part}/dropdown`)).status, 401);
@@ -67,7 +67,7 @@ test('Owner-scoped venue configuration and admin venue management', {
     assert.equal((await own()).data.total, 1); assert.equal((await own('', 'GET', undefined, cookieB)).data.total, 1);
     assert.equal((await own('/' + venueA, 'PUT', { owner_id: ownerB })).status, 400);
     assert.equal((await own('/' + venueA, 'PUT', {})).status, 400);
-    assert.equal((await own('/' + venueA, 'PUT', { venue_hall_capacity: 300, description: null })).status, 200);
+    assert.equal((await own('/' + venueA, 'PUT', { venue_hall_capacity: 300, description: null, venue_address:'Updated street address' })).status, 200);
     assert.equal((await request('/api/venues/' + venueA)).status, 404, 'Pending venue is private');
     assert.equal((await manage('', 'POST', sample)).status, 400, 'Admin must select owner');
     assert.equal((await manage('', 'POST', { venue_name: 'Blocked owner test', owner_id: blockedOwner })).status, 409);
@@ -121,6 +121,14 @@ test('Owner-scoped venue configuration and admin venue management', {
     assert.equal((await own(`/${venueA}/prices`, 'POST', { venue_price_id: priceA, venue_decoration_from_date: '2027-01-01', venue_decoration_to_date: '2027-01-02', venue_decoration_from_time: '08:00', venue_decoration_to_time: '16:00' })).status, 200);
     const cleared = await own(`/${venueA}/prices`, 'POST', { venue_price_id: priceA, venue_decoration_id: null }); assert.equal(cleared.status, 200); assert.equal(cleared.data.venue_decoration_from_date, null);
     const full = await own('/' + venueA); assert.equal(full.data.venue_type_slots.length, 2); assert.equal(full.data.venue_decoration_details.length, 2); assert.equal(full.data.venue_meals_details.length, 2); assert.equal(full.data.venue_price_details.length, 2); assert.equal(full.data.venue_aminites.is_ac_available, true); assert.equal(full.data.venue_aminites.is_chairs_available, true);
+    for(const read of [own,manage]){
+      const list=await read('?venue_id='+venueA+'&page=1&limit=1');assert.equal(list.status,200);assert.equal(list.data.total,1);assert.equal(list.data.items.length,1);
+      assert.equal(list.data.items[0].venue_address,'Updated street address');
+      for(const table of ['venue_meals_details','venue_price_details','venue_decoration_details'])assert.deepEqual(list.data.items[0][table],full.data[table],'List children match venue detail: '+table);
+      assert.deepEqual((await read('?venue_id='+venueA+'&page=2&limit=1')).data.items,[],'Multiple children do not inflate pages');
+    }
+    const otherList=await own('?venue_id='+venueB,'GET',undefined,cookieB);for(const table of ['venue_meals_details','venue_price_details','venue_decoration_details'])assert.ok(otherList.data.items[0][table].every(row=>row.venue_id===venueB),'Other owner lists contain only their venue children');
+
     await assert.rejects(pool.query('UPDATE public.venue_price_details SET venue_type_slot_id=$1 WHERE venue_price_id=$2', [foreignSlot, priceA]), error => error.code === '23503');
     await assert.rejects(pool.query('UPDATE public.venue_meals_details SET venue_id=$1 WHERE venue_meals_id=$2', [venueB, mealA]), error => error.code === '23514' && error.constraint === 'venue_meal_owner_immutable');
     assert.equal((await manage(`/${venueA}/type-slots/${slotA}`, 'DELETE')).status, 409, 'Referenced slot cannot be removed');
@@ -263,6 +271,10 @@ test('Owner-scoped venue configuration and admin venue management', {
       ['meals', { venue_meals_id: mealA, per_plate_price: 400 }],
       ['prices', { venue_price_id: priceA, venue_price: '6500.00' }],
     ];
+    const defaultBody={...nullInserts.find(([path])=>path==='prices')[1],is_default:true};
+    const createDefault=await manage(`/${delegatedVenue}/prices`,'POST',defaultBody,delegated);assert.equal(createDefault.status,201,'Create-only admin may add the first default');
+    assert.equal((await manage(`/${delegatedVenue}/prices`,'POST',defaultBody,delegated)).status,403,'Replacing a default also requires Edit permission');
+    assert.equal((await manage('/'+delegatedVenue)).data.venue_price_details.find(row=>row.is_default).venue_price_id,createDefault.data.venue_price_id,'Denied replacement preserves the original default');
     for (const [path, body] of updates) assert.equal((await manage(`/${venueA}/${path}`, 'POST', body, delegated)).status, 403, 'Create permission cannot update through POST');
     await grant({ edit: true, create: false });
     for (const [path, body] of nullInserts) assert.equal((await manage(`/${delegatedVenue}/${path}`, 'POST', body, delegated)).status, 403, 'Edit-only admin cannot insert a null ID');
@@ -272,6 +284,35 @@ test('Owner-scoped venue configuration and admin venue management', {
     await grant({ view: false, read: false, edit: false, create: false }); assert.equal((await manage('', 'GET', undefined, delegated)).status, 403);
     for (const part of dropdownParts) assert.equal((await manage(`/${venueA}/${part}/dropdown`, 'GET', undefined, delegated)).status, 403, 'Revoked grants immediately deny dropdown access');
     await assert.rejects(require('../dist/services/venueManagementService').updateManagedVenue({ type: 'admin', actor: { adminId, sessionToken: delegated.split('=')[1] } }, venueA, { venue_name: 'Stale permission' }), /Permission denied/);
+  });
+
+  await t.test('Owners and admins set one default per venue slot with atomic replacement',async()=>{
+    const id=(await own('','POST',{venue_name:'Default configuration test'})).data.venue_id;
+    const slot=(await own(`/${id}/type-slots`,'POST',{slot_name:'Day',from_time:'08:00',to_time:'16:00'})).data.venue_type_slot_id;
+    const otherSlot=(await own(`/${id}/type-slots`,'POST',{slot_name:'Night',from_time:'18:00',to_time:'06:00'})).data.venue_type_slot_id;
+    const input={venue_type_slot_id:slot,venue_from_date:'2027-01-01',venue_to_date:'2027-01-02',venue_from_time:'08:00',venue_to_time:'16:00',venue_price:1000,venue_advance_price:100};
+    const first=await own(`/${id}/prices`,'POST',input),second=await own(`/${id}/prices`,'POST',input);
+    assert.equal(first.status,201);assert.equal(first.data.is_default,false);assert.equal(second.data.is_default,false);
+    const save=(price,flag,call=own)=>call(`/${id}/prices`,'POST',{venue_price_id:price,is_default:flag});
+    assert.equal((await save(first.data.venue_price_id,true)).data.is_default,true);
+    assert.equal((await save(second.data.venue_price_id,true,manage)).data.is_default,true);
+    let detail=(await own('/'+id)).data;
+    assert.equal(detail.venue_price_details.find(row=>row.venue_price_id===first.data.venue_price_id).is_default,false);
+    assert.equal(detail.venue_price_details.filter(row=>row.is_default).length,1);
+    const night=await manage(`/${id}/prices`,'POST',{...input,venue_type_slot_id:otherSlot,venue_from_time:'18:00',venue_to_time:'06:00',is_default:true});assert.equal(night.status,201);
+    assert.equal((await own('/'+id)).data.venue_price_details.filter(row=>row.is_default).length,2,'Each slot can have its own fallback');
+    const races=await Promise.all([first,second].map(row=>save(row.data.venue_price_id,true)));assert.deepEqual(races.map(row=>row.status),[200,200]);
+    detail=(await own('/'+id)).data;
+    const dayPrices=detail.venue_price_details.filter(row=>row.venue_type_slot_id===slot),winner=dayPrices.find(row=>row.is_default),loser=dayPrices.find(row=>!row.is_default);
+    assert.equal(dayPrices.filter(row=>row.is_default).length,1,'Concurrent replacements cannot leave two defaults');
+    await assert.rejects(pool.query('UPDATE public.venue_price_details SET is_default=true WHERE venue_price_id=$1',[loser.venue_price_id]),error=>error.code==='23505','Database uniqueness also protects direct SQL writes');
+    assert.equal((await own(`/${id}/prices`,'POST',{venue_price_id:winner.venue_price_id,venue_price:1100})).data.is_default,true,'Omission on partial update preserves the flag');
+    for(const flag of ['true',1,null])assert.equal((await save(winner.venue_price_id,flag)).status,400);
+    assert.equal((await own(`/${id}/prices`,'POST',{venue_price_id:winner.venue_price_id,is_default:false},cookieB)).status,404);
+    const move=await manage(`/${id}/prices`,'POST',{venue_price_id:winner.venue_price_id,venue_type_slot_id:otherSlot});assert.equal(move.status,200);
+    detail=(await own('/'+id)).data;assert.equal(detail.venue_price_details.find(row=>row.venue_price_id===night.data.venue_price_id).is_default,false,'Moving a default also replaces the destination slot default');
+    const list=(await own('?venue_id='+id)).data.items[0];assert.equal(list.venue_price_details.find(row=>row.venue_price_id===winner.venue_price_id).is_default,true);
+    assert.equal((await save(winner.venue_price_id,false)).data.is_default,false);
   });
 
   await t.test('Admin deletion preserves venue history and child deletion respects references', async () => {

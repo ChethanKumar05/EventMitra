@@ -1,0 +1,2035 @@
+{
+  "info": {
+    "_postman_id": "e59630ae-c9d9-470b-a77d-a47053cecb36",
+    "name": "EventMitra - Booking and Notifications",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Apply migrations 016/017. Run folders individually with your existing user, venue owner and admin. Keep cookies enabled. Select a future date and valid slot-linked price from venue detail. Payment comes AFTER owner acceptance and collects configured advances only. Real Checkout runs in the frontend, then paste its callback values into the environment. Refund examples are skipped unless run_refund_examples=true. FCM registration is skipped until real tokens are set. No provider secrets belong in this collection. Full setup: docs/booking-api.md. Migration 018: owner signup requires unique user_name; owner_name may repeat. Login uses email or user_name. Verification purpose OTP creates a bearer session; password-reset proof does not. Migration 019 adds venue_address. Shared authenticated multipart upload: POST /api/uploads. Migration 020 adds is_default (false on insert), one fallback per venue/slot, and booking_date price resolution for user venue search/detail, quote and creation. Full endpoint changes: docs/default-venue-pricing.md."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3600"
+    },
+    {
+      "key": "country_code",
+      "value": "+91"
+    },
+    {
+      "key": "user_phone_number",
+      "value": ""
+    },
+    {
+      "key": "user_otp",
+      "value": "1111"
+    },
+    {
+      "key": "otp_token",
+      "value": ""
+    },
+    {
+      "key": "owner_email",
+      "value": ""
+    },
+    {
+      "key": "owner_password",
+      "value": ""
+    },
+    {
+      "key": "admin_login",
+      "value": ""
+    },
+    {
+      "key": "admin_password",
+      "value": ""
+    },
+    {
+      "key": "venue_id",
+      "value": ""
+    },
+    {
+      "key": "booking_venue_price_id",
+      "value": ""
+    },
+    {
+      "key": "booking_date",
+      "value": ""
+    },
+    {
+      "key": "booking_contact_email",
+      "value": ""
+    },
+    {
+      "key": "booking_id",
+      "value": ""
+    },
+    {
+      "key": "booking_idempotency_key",
+      "value": ""
+    },
+    {
+      "key": "lat",
+      "value": "12.9716"
+    },
+    {
+      "key": "long",
+      "value": "77.5946"
+    },
+    {
+      "key": "distance_km",
+      "value": "25"
+    },
+    {
+      "key": "razorpay_order_id",
+      "value": ""
+    },
+    {
+      "key": "razorpay_payment_id",
+      "value": ""
+    },
+    {
+      "key": "razorpay_signature",
+      "value": ""
+    },
+    {
+      "key": "refund_review_id",
+      "value": ""
+    },
+    {
+      "key": "run_refund_examples",
+      "value": "false"
+    },
+    {
+      "key": "user_fcm_token",
+      "value": ""
+    },
+    {
+      "key": "owner_fcm_token",
+      "value": ""
+    },
+    {
+      "key": "admin_fcm_token",
+      "value": ""
+    },
+    {
+      "key": "user_device_id",
+      "value": ""
+    },
+    {
+      "key": "owner_device_id",
+      "value": ""
+    },
+    {
+      "key": "admin_device_id",
+      "value": ""
+    },
+    {
+      "key": "user_notification_id",
+      "value": ""
+    },
+    {
+      "key": "owner_notification_id",
+      "value": ""
+    },
+    {
+      "key": "admin_notification_id",
+      "value": ""
+    },
+    {
+      "key": "owner_user_name",
+      "value": ""
+    },
+    {
+      "key": "managed_owner_user_name",
+      "value": ""
+    },
+    {
+      "key": "venue_address",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Resolve variables inside parsed JSON, preserving quotes/backslashes in private inputs.",
+          "if (pm.request.body && pm.request.body.mode === \"raw\") {",
+          "  const replace = value => typeof value === \"string\" ? pm.variables.replaceIn(value) : Array.isArray(value) ? value.map(replace) : value && typeof value === \"object\" ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, replace(item)])) : value;",
+          "  const body = replace(JSON.parse(pm.request.body.raw));",
+          "  if (body.contact_email === \"\") delete body.contact_email;",
+          "  pm.request.body.update(JSON.stringify(body, null, 2));",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Authenticate existing user, owner and admin",
+      "item": [
+        {
+          "name": "User login - request phone OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Development authentication uses OTP 1111. Use the separate User collection to sign up first if needed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"country_code\": \"{{country_code}}\",\n  \"user_phone_number\": \"{{user_phone_number}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json().data; const value = data.otp_token; if (value) pm.environment.set('otp_token', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify user OTP - creates user session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/auth/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "auth",
+                "verify-otp"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"{{user_otp}}\",\n  \"otp_token\": \"{{otp_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Owner login - venue owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/owner/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "owner",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) { const data = pm.response.json().data; if (data.access_token) pm.environment.set('owner_access_token', data.access_token); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{admin_login}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Optional push device registration",
+      "item": [
+        {
+          "name": "user - register real FCM device (optional)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/notifications/devices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "notifications",
+                "devices"
+              ]
+            },
+            "description": "Get an actual registration token from the Firebase frontend SDK. Skipped when blank.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{user_fcm_token}}\",\n  \"platform\": \"web\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('user_fcm_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json().data; const value = data.device_id; if (value) pm.environment.set('user_device_id', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "owner - register real FCM device (optional)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/owner/notifications/devices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "owner",
+                "notifications",
+                "devices"
+              ]
+            },
+            "description": "Get an actual registration token from the Firebase frontend SDK. Skipped when blank.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{owner_fcm_token}}\",\n  \"platform\": \"web\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('owner_fcm_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json().data; const value = data.device_id; if (value) pm.environment.set('owner_device_id', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "admin - register real FCM device (optional)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/notifications/devices",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "notifications",
+                "devices"
+              ]
+            },
+            "description": "Get an actual registration token from the Firebase frontend SDK. Skipped when blank.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{admin_fcm_token}}\",\n  \"platform\": \"web\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_fcm_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json().data; const value = data.device_id; if (value) pm.environment.set('admin_device_id', value); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Discover venues and create a booking request",
+      "item": [
+        {
+          "name": "Venues - highest rating first",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/venues?page=1&limit=20&sort_by=rating&booking_date={{booking_date}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "venues"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "rating"
+                },
+                {
+                  "key": "search",
+                  "value": "Hall",
+                  "disabled": true
+                },
+                {
+                  "key": "city",
+                  "value": "Bengaluru",
+                  "disabled": true
+                },
+                {
+                  "key": "state",
+                  "value": "Karnataka",
+                  "disabled": true
+                },
+                {
+                  "key": "area",
+                  "value": "Indiranagar",
+                  "disabled": true
+                },
+                {
+                  "key": "pin_code",
+                  "value": "560038",
+                  "disabled": true
+                },
+                {
+                  "key": "min_rating",
+                  "value": "3",
+                  "disabled": true
+                },
+                {
+                  "key": "booking_date",
+                  "value": "{{booking_date}}"
+                }
+              ]
+            },
+            "description": "Set venue_id from the chosen data.items record. Other filters are optional and disabled. With booking_date, data includes effective date-specific prices or slot defaults, price_source and has_price_for_date. Choose a returned venue_price_id; defaults ignore their stored venue date range."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Venues - nearby with radius",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/venues?page=1&limit=20&lat={{lat}}&long={{long}}&distance_km={{distance_km}}&sort_by=distance&booking_date={{booking_date}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "venues"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "lat",
+                  "value": "{{lat}}"
+                },
+                {
+                  "key": "long",
+                  "value": "{{long}}"
+                },
+                {
+                  "key": "distance_km",
+                  "value": "{{distance_km}}"
+                },
+                {
+                  "key": "sort_by",
+                  "value": "distance"
+                },
+                {
+                  "key": "booking_date",
+                  "value": "{{booking_date}}"
+                }
+              ]
+            },
+            "description": " With booking_date, data includes effective date-specific prices or slot defaults, price_source and has_price_for_date. Choose a returned venue_price_id; defaults ignore their stored venue date range."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get chosen venue and its bookable price/slot/package IDs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/venues/{{venue_id}}?booking_date={{booking_date}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "venues",
+                "{{venue_id}}"
+              ],
+              "query": [
+                {
+                  "key": "booking_date",
+                  "value": "{{booking_date}}"
+                }
+              ]
+            },
+            "description": "Inspect data.venue_price_details. Set booking_venue_price_id to a price valid on booking_date. No private owner data is returned. With booking_date, data includes effective date-specific prices or slot defaults, price_source and has_price_for_date. Choose a returned venue_price_id; defaults ignore their stored venue date range."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Quote selected date and packages",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/bookings/quote",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "bookings",
+                "quote"
+              ]
+            },
+            "description": "Edit guest_count and optional package flags in BOTH quote and creation. The server returns total, advance and balance; quote does not reserve.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_price_id\": \"{{booking_venue_price_id}}\",\n  \"booking_date\": \"{{booking_date}}\",\n  \"guest_count\": 10,\n  \"include_decoration\": false,\n  \"include_meals\": false,\n  \"contact_email\": \"{{booking_contact_email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create booking - awaiting owner acceptance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{booking_idempotency_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/bookings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "bookings"
+              ]
+            },
+            "description": "Same body + same key safely retries. Clear booking_idempotency_key before creating another intended booking. Blank contact email is omitted; required when profile has no email. IDs and amounts come from server.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venue_price_id\": \"{{booking_venue_price_id}}\",\n  \"booking_date\": \"{{booking_date}}\",\n  \"guest_count\": 10,\n  \"include_decoration\": false,\n  \"include_meals\": false,\n  \"contact_email\": \"{{booking_contact_email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('booking_idempotency_key')) pm.environment.set('booking_idempotency_key', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200,201]); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json().data; const value = data.booking_id; if (value) pm.environment.set('booking_id', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "User booking details and immutable price breakdown",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/bookings/{{booking_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "bookings",
+                "{{booking_id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Owner reviews and accepts",
+      "item": [
+        {
+          "name": "Owner requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/owner/bookings?page=1&limit=20&booking_status=Requested",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "owner",
+                "bookings"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "booking_status",
+                  "value": "Requested"
+                },
+                {
+                  "key": "search",
+                  "value": "BKG",
+                  "disabled": true
+                },
+                {
+                  "key": "venue_id",
+                  "value": "{{venue_id}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Owner booking detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/owner/bookings/{{booking_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "owner",
+                "bookings",
+                "{{booking_id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Owner accept - opens advance payment window",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/owner/bookings/{{booking_id}}/decision",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "owner",
+                "bookings",
+                "{{booking_id}}",
+                "decision"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"accept\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Advance payment after acceptance",
+      "item": [
+        {
+          "name": "Create or reuse Razorpay advance order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/bookings/{{booking_id}}/payment-order",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "bookings",
+                "{{booking_id}}",
+                "payment-order"
+              ]
+            },
+            "description": "Configure server Razorpay test keys first. Response includes public key_id, paise amount and order_id. Open Standard Checkout in frontend; Postman cannot perform the customer payment. 202 means poll later. Zero-advance bookings do not require this API."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200,202]); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json().data; const value = data.order_id; if (value) pm.environment.set('razorpay_order_id', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify actual Checkout payment callback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/bookings/{{booking_id}}/verify-payment",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "bookings",
+                "{{booking_id}}",
+                "verify-payment"
+              ]
+            },
+            "description": "Skipped until actual Checkout callback payment ID/signature are entered. Server HMAC + provider capture verification required. 202 means capture pending; do not show confirmation yet.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpay_order_id\": \"{{razorpay_order_id}}\",\n  \"razorpay_payment_id\": \"{{razorpay_payment_id}}\",\n  \"razorpay_signature\": \"{{razorpay_signature}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('razorpay_payment_id') || !pm.variables.get('razorpay_signature')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200,202]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check final booking - inspect is_confirmed",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/bookings/{{booking_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "bookings",
+                "{{booking_id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 - User, owner and admin lists",
+      "item": [
+        {
+          "name": "user bookings - paginated and filtered",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/bookings?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "bookings"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": "BKG",
+                  "disabled": true
+                },
+                {
+                  "key": "booking_status",
+                  "value": "Accepted",
+                  "disabled": true
+                },
+                {
+                  "key": "payment_state",
+                  "value": "paid",
+                  "disabled": true
+                },
+                {
+                  "key": "venue_id",
+                  "value": "{{venue_id}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "owner bookings - paginated and filtered",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/owner/bookings?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "owner",
+                "bookings"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": "BKG",
+                  "disabled": true
+                },
+                {
+                  "key": "booking_status",
+                  "value": "Accepted",
+                  "disabled": true
+                },
+                {
+                  "key": "payment_state",
+                  "value": "paid",
+                  "disabled": true
+                },
+                {
+                  "key": "venue_id",
+                  "value": "{{venue_id}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "admin bookings - paginated and filtered",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/admin/bookings?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "bookings"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": "BKG",
+                  "disabled": true
+                },
+                {
+                  "key": "booking_status",
+                  "value": "Accepted",
+                  "disabled": true
+                },
+                {
+                  "key": "payment_state",
+                  "value": "paid",
+                  "disabled": true
+                },
+                {
+                  "key": "venue_id",
+                  "value": "{{venue_id}}",
+                  "disabled": true
+                },
+                {
+                  "key": "owner_id",
+                  "value": "OWNER_ID",
+                  "disabled": true
+                },
+                {
+                  "key": "user_id",
+                  "value": "USER_ID",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin booking detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/admin/bookings/{{booking_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "bookings",
+                "{{booking_id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 - Private notification inboxes",
+      "item": [
+        {
+          "name": "user notification inbox",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/notifications?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "unread_only",
+                  "value": "true",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json().data; const value = data.items[0]?.notification_id; if (value) pm.environment.set('user_notification_id', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "user mark notification read",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/notifications/{{user_notification_id}}/read",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "notifications",
+                "{{user_notification_id}}",
+                "read"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('user_notification_id')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "owner notification inbox",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/owner/notifications?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "owner",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "unread_only",
+                  "value": "true",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json().data; const value = data.items[0]?.notification_id; if (value) pm.environment.set('owner_notification_id', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "owner mark notification read",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/owner/notifications/{{owner_notification_id}}/read",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "owner",
+                "notifications",
+                "{{owner_notification_id}}",
+                "read"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('owner_notification_id')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "admin notification inbox",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/admin/notifications?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "unread_only",
+                  "value": "true",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json().data; const value = data.items[0]?.notification_id; if (value) pm.environment.set('admin_notification_id', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "admin mark notification read",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/admin/notifications/{{admin_notification_id}}/read",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "notifications",
+                "{{admin_notification_id}}",
+                "read"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_notification_id')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 - OPTIONAL rejection and admin refund approval",
+      "description": "Run only on an intentional test booking. Set run_refund_examples=true. A paid rejection opens review; approval queues a real provider refund through the worker. Never run this folder casually on production.",
+      "item": [
+        {
+          "name": "Owner reject - paid booking requires refund review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/owner/bookings/{{booking_id}}/decision",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "owner",
+                "bookings",
+                "{{booking_id}}",
+                "decision"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"reject\",\n  \"reason\": \"Test venue cannot fulfil booking\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.variables.get('run_refund_examples') !== 'true') pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json().data; const value = data.refund_reviews.find(row => row.status === 'Pending')?.refund_review_id; if (value) pm.environment.set('refund_review_id', value); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin pending refund reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/admin/bookings/refund-reviews?page=1&limit=20&status=Pending",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "bookings",
+                "refund-reviews"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "Pending"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.variables.get('run_refund_examples') !== 'true') pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin approve refund - worker processes after review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/bookings/{{booking_id}}/refund-reviews/{{refund_review_id}}/decision",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "bookings",
+                "{{booking_id}}",
+                "refund-reviews",
+                "{{refund_review_id}}",
+                "decision"
+              ]
+            },
+            "description": "Requires booking_management Edit. Change decision to reject to decline. Approved does not mean processed; worker/provider completion determines final state.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approve\",\n  \"reason\": \"Reviewed test booking; owner unavailable\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.variables.get('run_refund_examples') !== 'true') pm.execution.skipRequest();",
+                  "if (!pm.variables.get('refund_review_id')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inspect refund status after worker pass",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/bookings/{{booking_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "bookings",
+                "{{booking_id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.variables.get('run_refund_examples') !== 'true') pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "09 - Unregister devices and logout",
+      "item": [
+        {
+          "name": "user unregister this push device (optional)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/notifications/devices/{{user_device_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "notifications",
+                "devices",
+                "{{user_device_id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('user_device_id')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "user logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "owner unregister this push device (optional)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/owner/notifications/devices/{{owner_device_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "owner",
+                "notifications",
+                "devices",
+                "{{owner_device_id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('owner_device_id')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "owner logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/owner/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "owner",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "admin unregister this push device (optional)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/admin/notifications/devices/{{admin_device_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "notifications",
+                "devices",
+                "{{admin_device_id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_device_id')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "admin logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/admin/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Expected status', function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -13,5 +13,5 @@ export async function listVenues(query: VenueListQuery) {
   filters.equal('r.owner_id',query.owner_id);
   if (query.min_capacity !== undefined) filters.add(`r.venue_hall_capacity>=${filters.bind(query.min_capacity)}`);
   if (query.max_capacity !== undefined) filters.add(`r.venue_hall_capacity<=${filters.bind(query.max_capacity)}`);
-  return paginatedQuery<VenueRow>('venue_details','venue_id, venue_code, owner_id, venue_name, city, state, status, is_active, created_at',listOrder(query,listColumns.venues,'created_at DESC, venue_id DESC','venue_id'),filters,query);
+  return paginatedQuery<VenueRow>('venue_details','venue_id, venue_code, owner_id, venue_name, venue_address, city, state, status, is_active, created_at',listOrder(query,listColumns.venues,'created_at DESC, venue_id DESC','venue_id'),filters,query);
 }

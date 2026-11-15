@@ -13,5 +13,4 @@ export async function findBookingById(bookingId: string): Promise<BookingRow | n
   return rows[0] ?? null;
 }
 
-// Create-booking API is intentionally NOT exposed: availability must be checked
-// with database-backed concurrency control before accepting bookings.
+// Booking writes and database-backed availability checks are implemented in services/bookingService.ts.

@@ -39,14 +39,14 @@ src/
   utils/{id,response}.ts
 ```
 
-## Database tables (20)
+## Original domain tables
 
 - **Admin (4):** `roles`, `modules`, `admin`, `admin_permission`
 - **User (3):** `"user"`, `user_phone_verification`, `user_account_details`
 - **Owner (3):** `owner`, `owner_account_details`, `owner_phone_verification`
 - **Venue (7):** `venue_details`, `venue_type_slots`, `venue_aminites`, `venue_decoration_details`, `venue_meals_details`, `venue_price_details`, `venue_meal_decoration_ratings`
 - **Booking (3):** `booking`, `booking_price_details`, `booking_payment_details`
-- Supporting table: `migrations_history` (not counted above).
+- Additional migrations add sessions, OTP controls, security catalogs, refund reviews, webhook events, notifications, device registrations and outbox tables; `migrations_history` tracks applied versions.
 
 **Important:** The names and odd spellings such as `venue_aminites`, `meal_deatails`, `booking_totoal_tax`, and `is_cancellation_availble` intentionally match your notes. SQL uses `public."user"` because `user` is reserved in PostgreSQL. The review table uses your latest name (`venue_meal_decoration_ratings`), not the earlier `venue_meal_decoration_details`.
 
@@ -101,18 +101,17 @@ GET  /api/venues?page=1&limit=20
 GET  /api/venues/:venueId
 ```
 
-The venue read routes only return `status='Active'` and `is_active=true` rows. `/api/user/health` remains a compatibility health check. User/owner authentication, admin user/owner management and bank account APIs are implemented. Booking CRUD is not implemented yet. Admin security routes are documented in [docs/admin-api.md](docs/admin-api.md).
+The venue read routes only return `status='Active'` and `is_active=true` rows. `/api/user/health` remains a compatibility health check. User/owner authentication, admin user/owner management and bank account APIs are implemented. User booking requests, owner decisions, configured advance payments and notifications are implemented; see [Booking API](docs/booking-api.md). Admin security routes are documented in [docs/admin-api.md](docs/admin-api.md).
 
-## Booking & payment safety notes
+## Booking, Razorpay advances and notifications
 
-- **No reservation-writing endpoints are exposed yet.** The booking migration includes a PostgreSQL exclusion constraint that prevents overlapping `Accepted` bookings at the same venue, but `Requested` and `Hold` bookings have no expiry/concurrency management. Booking per-slot semantics and multi-hall bookings must be designed before accepting real reservations.
-- **No payment-writing endpoints are exposed yet.** Razorpay order creation, signature verification, idempotent webhooks, reconciliation, refunds, and authorization are still to be implemented. Raw JSON must not be trusted as payment confirmation.
-- **Admin, owner and user authentication are implemented.** OTP delivery currently uses the development stub described below. Owner account approval and resource ownership checks are still needed before exposing protected booking or owner mutations. The included public venues reads do not expose owner private information.
-- Owner `password` column must receive a strong *hash*, never plaintext. `otp` columns must receive hashed OTPs, never plaintext codes.
-- The user supplied `booking_payment_id` in `booking`. We retain it as a nullable pointer to a selected payment, while `booking_payment_details` supports multiple transactions for one booking.
-- Decorations/meals/pricing associations do not yet enforce that referenced packages belong to the same venue. Validate this in booking logic before launch.
-- For recurring/day slots, final pricing and availability rules need a business decision. Current SQL models use timestamp windows.
-- Postgres extensions: migration 005 uses `btree_gist` for the exclusion constraint. Your DB role must have permission to create this trusted extension (or ask the database administrator to enable it).
+User discovery supports rating/distance ordering, radius and location filters. Booking creation snapshots server-calculated prices and configured advances. Owners accept before payment; acceptance reserves inventory with a payment deadline. Signed Checkout verification, raw signed webhooks and provider reconciliation confirm captures. Paid rejections require admin refund review. Email, FCM and private inbox notifications use a durable outbox.
+
+Apply migrations 016/017 with `npm run migrate`, then run `npm run booking:worker` alongside the API. Configure private Razorpay, SMTP and Firebase credentials using `.env.example`. No provider credentials are supplied. Existing development OTP authentication remains disabled in production until real OTP delivery is implemented.
+
+See [Booking API, payloads and setup](docs/booking-api.md), [Booking Postman collection](docs/postman/EventMitra.Booking.postman_collection.json) and [Booking environment](docs/postman/EventMitra.Booking.local.postman_environment.json). Run `npm run test:booking:integration:local` for isolated PostgreSQL/HTTP tests with mocked payment/push providers and a local SMTP server. Live provider validation needs your credentials and an actual test Checkout payment.
+
+The flow reserves the whole venue and collects the configured advance. Remaining-balance collection, customer cancellation and independent hall inventory are outside this implementation. Historical bookings retain their reservation state and original amounts. PostgreSQL's `btree_gist` extension is required by migration 005; the database role needs permission to create it or a DBA must enable it.
 
 ## Build verification
 
@@ -127,8 +126,8 @@ Migration 010 adds usernames, normalized unique role/module names, and stricter 
 
 ## Owner authentication
 
-Owner login/logout is implemented separately. Owners can log in using owner_name + password
-or email + password. Pending and verified owners are allowed; names must be unique after migration 012.
+Owner login/logout is implemented separately. Owners can log in using unique user_name + password
+or email + password. Pending and verified owners are allowed; display owner_name values can repeat after migration 018. Normal email/phone OTP verification also returns an eight-hour owner bearer/cookie session. Signup requires user_name.
 See [owner authentication](docs/owner-auth.md) and import the separate
 [owner Postman collection](docs/postman/EventMitra.Owner.postman_collection.json).
 Apply pending migration 011 before running these endpoints.
@@ -143,4 +142,6 @@ Admin user/owner CRUD and bank account APIs are documented in [People and accoun
 
 Owner-scoped venue create/update/list/full-detail and admin venue management are documented in [Venue management](docs/venue-management-api.md). Apply migration 015 for generated venue/decoration codes, same-venue slot/package pricing links and the two-meal limit. Admin access uses `venue_management` module grants. Owner changes to approved venues return them to Pending. Updated owner/admin Postman collections include all configuration flows. Run `npm run test:venue:integration:local` for isolated integration tests.
 
-Owner-scoped venue create/update/list/full-detail and admin venue management are documented in [Venue management](docs/venue-management-api.md). Apply migration 015 for generated venue/decoration codes, same-venue slot/package pricing links and the two-meal limit. Admin access uses `venue_management` module grants. Owner changes to approved venues return them to Pending. Updated owner/admin Postman collections include all configuration flows. Run `npm run test:venue:integration:local` for isolated integration tests.
+Migration 019 adds nullable venue_address to create/update/list/detail responses. Owner/admin paginated venue lists also include meals, pricing and decoration arrays without changing page counts. Authenticated admin/user/owner file uploads share POST /api/uploads; configure AWS settings from .env.example and see [S3 upload bodies and setup](docs/uploads-api.md). Run `npm run test:upload:integration:local` for the new isolated suite.
+
+Migration **020** adds `venue_price_details.is_default` (default false), one default per venue/slot, and booking-date fallback shared by user discovery, detail, quotes and booking creation. Owners/admins set defaults through existing price-save POST endpoints. [Default pricing rules and updated APIs](docs/default-venue-pricing.md).

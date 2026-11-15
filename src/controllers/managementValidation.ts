@@ -5,10 +5,10 @@ import { normalizeEmail, validatePhone } from '../utils/adminValidation';
 import { checkPassword } from '../security/password';
 import { text } from './securityValidation';
 import { userBody, userSignupInput } from './userValidation';
-import { ownerName, signupInput } from './ownerValidation';
+import { ownerName, ownerUsername, signupInput } from './ownerValidation';
 
 const userFields = ['country_code', 'user_phone_number', 'user_name', 'gender', 'email', 'profile_image', 'whatsapp_number', 'alternative_number'];
-const ownerFields = ['country_code', 'owner_phone_number', 'owner_name', 'gender', 'email', 'profile_image', 'whatsapp_number', 'alternative_number', 'alternative_email', 'password', 'doc_type', 'doc_number', 'doc_image', 'pin_code', 'state', 'city', 'area', 'lat', 'long', 'address'];
+const ownerFields = ['user_name', 'country_code', 'owner_phone_number', 'owner_name', 'gender', 'email', 'profile_image', 'whatsapp_number', 'alternative_number', 'alternative_email', 'password', 'doc_type', 'doc_number', 'doc_image', 'pin_code', 'state', 'city', 'area', 'lat', 'long', 'address'];
 const statuses = ['pending', 'verified', 'rejected', 'blocked', 'hold', 'deleted'];
 
 export function managementProfileInput(kind: PersonKind, value: unknown, create = false): ProfileInput {
@@ -32,7 +32,7 @@ export function managementProfileInput(kind: PersonKind, value: unknown, create 
         input[field] = value;
       } else if (field === 'owner_name') input[field] = ownerName(value);
       else if (field === 'user_name') {
-        input[field] = text(value, field, 150).replace(/\s+/g, ' ');
+        input[field] = kind === 'owner' ? ownerUsername(value) : text(value, field, 150).replace(/\s+/g, ' ');
         if (typeof value === 'string' && /[\u0000-\u001f\u007f]/.test(value)) httpError(400, 'Invalid user_name');
       } else if (field === 'email' || field === 'alternative_email') {
         input[field] = kind === 'owner' && field === 'email' ? normalizeEmail(value) : optional(value, normalizeEmail);

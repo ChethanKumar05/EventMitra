@@ -31,7 +31,7 @@ test('Admin people management and user/owner bank accounts', {
   const manage = (path, method = 'GET', body, cookie = admin) => request('/api/admin/' + path, method, body, cookie);
   const bankBody = number => ({ account_number: number, account_holder_name: 'Test Account Holder', ifsc_code: 'sbin0001234', branch_name: 'Central', branch_address: 'Test branch address', passbook_image: '/uploads/passbook.jpg' });
   const userBody = number => ({ country_code: '+91', user_phone_number: number, user_name: 'Test User %_ Name', gender: 'm', email: `${number}@example.test` });
-  const ownerBody = number => ({ country_code: '+91', owner_phone_number: number, owner_name: 'Owner ' + number, email: `${number}@example.test`, password, gender: 'f', doc_type: 'passport', doc_number: 'TEST-DOCUMENT', doc_image: '/uploads/doc.jpg', pin_code: '560001', state: 'Karnataka', city: 'Bengaluru', area: 'Central', lat: 0, long: 0, address: 'Test address' });
+  const ownerBody = number => ({ country_code: '+91', owner_phone_number: number, owner_name: 'Owner ' + number, user_name: 'owner_'+number, email: `${number}@example.test`, password, gender: 'f', doc_type: 'passport', doc_number: 'TEST-DOCUMENT', doc_image: '/uploads/doc.jpg', pin_code: '560001', state: 'Karnataka', city: 'Bengaluru', area: 'Central', lat: 0, long: 0, address: 'Test address' });
   const people = {};
 
   await t.test('Admin CRUD, validation, safe responses and filtered pagination', async () => {
@@ -51,7 +51,7 @@ test('Admin people management and user/owner bank accounts', {
       if (kind === 'owner') {
         const stored = (await pool.query('SELECT password FROM public.owner WHERE owner_id=$1', [id])).rows[0].password;
         assert.notEqual(stored, password); assert.equal(await verifyPassword(password, stored), true);
-        assert.equal((await manage(resource, 'POST', { ...body, owner_phone_number: '9876600099', email: 'unique@example.test', owner_name: '  OWNER   9876600001  ' })).status, 409);
+        assert.equal((await manage(resource, 'POST', { ...body, owner_phone_number: '9876600099', email: 'unique@example.test', user_name:'OWNER_9876600001', owner_name: 'Duplicate username' })).status, 409);
       }
       const otherBody = kind === 'user' ? userBody('9876500002') : ownerBody('9876600002');
       const other = await manage(resource, 'POST', otherBody); assert.equal(other.status, 201);
