@@ -77,7 +77,7 @@ export async function listManagedVenues(actor: VenueActor, query: ManagedVenueQu
     SELECT (SELECT count(*)::int FROM matching) AS total,coalesce((SELECT json_agg(expanded ORDER BY ${order}) FROM expanded),'[]'::json) AS items`,values)).rows[0];
   const totalPages = Math.ceil(result.total/query.limit);
   return {...result,page:query.page,limit:query.limit,totalPages,hasNextPage:query.page<totalPages,hasPreviousPage:query.page>1};
-}
+} 
 
 export async function venueOwnerDropdown(query: ManagementListQuery) {
   return paginatedQuery('owner', ownerDropdownColumns.map(column => `r.${column}`).join(','), listOrder(query, ownerDropdownColumns, 'owner_name ASC,owner_id ASC', 'owner_id'), managementFilters(query, ownerDropdownColumns), query);
